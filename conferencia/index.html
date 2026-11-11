@@ -219,7 +219,7 @@ dialog .conta-erro{padding:8px 20px 0;min-height:18px;color:var(--erro);font-siz
 
 <header class="topo">
   <h1>Conferência de etiquetas</h1>
-  <span class="rota">GODKS &rarr; KOS · v3</span>
+  <span class="rota">GODKS &rarr; KOS · v3.1</span>
   <div class="dir">
     <span class="quem" id="quem"></span>
     <label class="mudo"><input type="checkbox" id="som" checked> som</label>
@@ -1169,6 +1169,16 @@ async function carregarRelatorio(file) {
   if (!r.produtos.size) {
     aviso('Esse PDF não parece o relatório de movimentação',
           'Não encontrei nenhuma linha de produto. Se o arquivo certo é o cadastro de códigos, use "Atualizar cadastro".');
+    return;
+  }
+  const movimentos = [...r.produtos.values()].reduce((s, p) => s + p.apontamentos.length + p.transferencias.length, 0);
+  if (!movimentos) {
+    const daKos = linhas.slice(0, 8).some(l => /KOS ACRILICOS/.test(l) || /^\s*KOS\s+M\s*O\s*V/.test(l));
+    aviso(daKos ? 'Esse é o relatório da empresa KOS' : 'Esse relatório não tem apontamento nem transferência',
+      daKos ? 'A conferência usa a movimentação da GODKS (no cabeçalho aparece "01 GODKS INDUSTRIA DE PLASTICOS"). ' +
+              'No ERP, troque a empresa para GODKS e puxe de novo, do dia 1 do mês até hoje.'
+            : 'Encontrei os produtos, mas nenhuma linha de apontamento (SCANER) nem de transferência para a KOS. ' +
+              'Confira se é a movimentação da GODKS, do dia 1 do mês até hoje.');
     return;
   }
 
