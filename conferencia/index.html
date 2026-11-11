@@ -122,6 +122,9 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
 .bipadas li{display:flex;gap:11px;align-items:baseline;padding:8px 0;
             border-bottom:1px solid var(--traco2);font-size:14px}
 .bipadas li:last-child{border-bottom:0}
+.bipadas li{flex-wrap:wrap}
+.bipadas .motivo{flex-basis:100%;padding-left:20px;margin-top:-3px;font-size:12.5px;line-height:1.4;color:var(--tinta2)}
+.bipadas .motivo.atencao{color:var(--espera)} .bipadas .motivo.erro{color:var(--erro)}
 .marca{width:9px;height:9px;border-radius:50%;flex:none;position:relative;top:1px}
 .marca.ok{background:var(--ok)} .marca.atencao{background:var(--espera)} .marca.erro{background:var(--erro)}
 .bipadas .pos{font-family:var(--mono);font-size:12px;color:var(--tinta2);
@@ -1758,6 +1761,14 @@ function renderResumo() {
   $('bt-outro').onclick = () => { conf = null; rel = null; render(); };
 }
 
+/* Por que a etiqueta ficou amarela ou vermelha, para não depender de lembrar da hora da bipagem. */
+function motivoDe(b) {
+  if (b.resolvida) return '';
+  if (!(b.nivel === 'erro' || (b.nivel === 'atencao' && b.titulo !== 'Aguardando transferência'))) return '';
+  const t = [b.nivel === 'erro' ? b.detalhe : '', b.aviso].filter(Boolean).join(' ') || b.detalhe || '';
+  return t ? `<div class="motivo ${b.nivel}">${esc(t)}</div>` : '';
+}
+
 function renderBipadas() {
   const l = conf.bipadas || [];
   $('conta-bip').textContent = l.length;
@@ -1772,7 +1783,7 @@ function renderBipadas() {
         !b.resolvida && b.bloqueia !== false &&
         (b.nivel === 'erro' || (b.nivel === 'atencao' && b.titulo !== 'Aguardando transferência'))
           ? (b.sugerePacote ? ` <button class="btn btn-min" data-pacote="${i}">É caixa de ${num(b.sugerePacote)}</button>` : '') +
-            ` <button class="btn btn-min" data-bip="${i}">Resolver</button>` : ''}</span>
+            ` <button class="btn btn-min" data-bip="${i}">Resolver</button>` : ''}</span>${motivoDe(b)}
     </li>`).join('');
   $('lista-bip').querySelectorAll('[data-bip]').forEach(b =>
     b.onclick = () => resolverBipada(+b.dataset.bip));
