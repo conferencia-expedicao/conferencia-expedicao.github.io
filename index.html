@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Coletor de etiquetas — GODKS / KOS</title>
+<style>
+:root{
+  --fundo:#101A24; --painel:#17242F; --linha:#2A3B4A;
+  --texto:#EEF4F8; --fraco:#93A8B8; --etiqueta:#1B9FD8;
+  --ok:#36C07E; --kos:#1B9FD8; --erro:#F2645F;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overscroll-behavior:none}
+body{background:var(--fundo);color:var(--texto);font-family:var(--sans);
+     display:flex;flex-direction:column;height:100dvh}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--linha);
+       background:var(--painel);color:var(--texto);padding:11px 15px}
+button:active{transform:scale(.985)}
+button[disabled]{opacity:.45}
+.forte{background:var(--etiqueta);border-color:var(--etiqueta);color:#07202C;font-weight:650}
+
+header{padding:11px 15px;display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--linha)}
+header h1{font-size:15px;margin:0;font-weight:600}
+header .rota{font-family:var(--mono);font-size:11.5px;color:var(--fraco);letter-spacing:.04em}
+header .versao{background:var(--linha);color:var(--texto);padding:1px 6px;border-radius:8px;
+               margin-left:5px;font-size:10.5px}
+header .contador{margin-left:auto;font-family:var(--mono);font-size:21px;font-weight:650}
+header .contador small{font-size:11px;color:var(--fraco);font-weight:400;display:block;
+                       text-align:right;letter-spacing:.02em;font-family:var(--sans)}
+
+.camera{position:relative;background:#000;flex:none;height:54dvh;overflow:hidden}
+.camera video{width:100%;height:100%;object-fit:cover;display:block}
+.mira{position:absolute;left:5%;right:5%;top:50%;height:30%;transform:translateY(-50%);
+      border:2px solid #FFFFFF66;border-radius:8px;box-shadow:0 0 0 9999px #0007}
+.mira::after{content:'';position:absolute;left:0;right:0;top:50%;height:2px;
+             margin-top:-1px;background:#F2645FCC}
+.mira.pegou{border-color:var(--ok);background:#36C07E26}
+.ferramentas{position:absolute;right:11px;bottom:11px;display:flex;gap:8px}
+.ferramentas button{padding:9px 12px;background:#0B141BCC;backdrop-filter:blur(4px);font-size:13px}
+.situacao{position:absolute;left:11px;bottom:15px;font-size:12.5px;color:#D7E5EE;
+          background:#0B141BCC;backdrop-filter:blur(4px);padding:5px 10px;border-radius:14px;
+          max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.aviso{padding:15px;margin:15px;border:1px solid var(--linha);border-radius:8px;
+       background:var(--painel);font-size:14.5px;line-height:1.5}
+.aviso b{color:var(--erro)}
+.oculto{display:none!important}
+
+.manual{padding:11px 15px;border-bottom:1px solid var(--linha)}
+.manual>button{width:100%;font-size:14px;color:var(--fraco)}
+.manual form{display:flex;gap:8px}
+.manual input{flex:1;min-width:0;font-family:var(--mono);font-size:17px;letter-spacing:.04em;
+  padding:11px 13px;border-radius:6px;border:1px solid var(--linha);
+  background:var(--fundo);color:var(--texto)}
+.manual input::placeholder{font-family:var(--sans);font-size:13.5px;letter-spacing:0;color:var(--fraco)}
+.manual input:focus{outline:2px solid var(--etiqueta);outline-offset:1px}
+
+.ultima{padding:13px 15px;border-bottom:1px solid var(--linha);min-height:76px}
+.ultima .nome{font-size:16px;font-weight:600;line-height:1.25}
+.ultima .meta{font-family:var(--mono);font-size:12.5px;color:var(--fraco);margin-top:4px;
+              display:flex;gap:13px;flex-wrap:wrap}
+.ultima .nada{color:var(--fraco);font-size:14.5px}
+.tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:9px;vertical-align:2px;
+     margin-left:7px;letter-spacing:.03em}
+.tag.kos{background:#1B9FD822;color:var(--kos)}
+.tag.godks{background:#93A8B822;color:var(--fraco)}
+.tag.suspeita{background:#F2645F26;color:var(--erro)}
+
+.lista{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.lista ol{list-style:none;margin:0;padding:0;counter-reset:n}
+.lista li{display:flex;gap:11px;align-items:baseline;padding:9px 15px;
+          border-bottom:1px solid #1E2C38;font-size:14px}
+.lista li .pos{font-family:var(--mono);font-size:11.5px;color:var(--fraco);min-width:22px}
+.lista li .doc{font-family:var(--mono);font-size:12.5px;color:var(--fraco)}
+.lista li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lista .vazia{padding:26px 15px;color:var(--fraco);font-size:14.5px;text-align:center}
+.lista .excluir{flex:none;padding:3px 11px;font-size:19px;line-height:1.1;color:var(--fraco);
+  background:transparent;border:1px solid var(--linha);border-radius:6px}
+.lista .excluir:active{color:var(--erro);border-color:var(--erro)}
+
+footer{border-top:1px solid var(--linha);padding:11px 15px;
+       padding-bottom:calc(11px + env(safe-area-inset-bottom))}
+footer .largo{width:100%;padding:14px;font-size:16px}
+footer .secundarios{display:flex;gap:7px;margin-top:8px}
+footer .secundarios button{flex:1;padding:10px 5px;font-size:13px}
+
+.envio{position:fixed;inset:auto 0 0 0;background:var(--painel);z-index:12;
+       border-top:1px solid var(--linha);padding:15px;
+       padding-bottom:calc(15px + env(safe-area-inset-bottom))}
+.envio p{margin:0 0 10px;font-size:14px;color:var(--fraco);line-height:1.45}
+.envio input{width:100%;padding:12px 13px;border-radius:6px;border:1px solid var(--linha);
+       background:var(--fundo);color:var(--texto);font-size:16px}
+.envio input:focus{outline:2px solid var(--etiqueta);outline-offset:1px}
+.envio-acoes{display:flex;gap:8px;margin-top:11px}
+.envio-acoes button{flex:1}
+
+.saida{position:fixed;inset:auto 0 0 0;background:var(--painel);border-top:1px solid var(--linha);
+       padding:15px;z-index:11;padding-bottom:calc(15px + env(safe-area-inset-bottom))}
+.saida p{margin:0 0 9px;font-size:13.5px;color:var(--fraco)}
+.saida textarea{width:100%;font-family:var(--mono);font-size:13px;background:var(--fundo);
+       color:var(--texto);border:1px solid var(--linha);border-radius:6px;padding:10px;resize:none}
+.saida button{width:100%;margin-top:9px}
+
+.flash{position:fixed;inset:0;background:var(--ok);opacity:0;pointer-events:none;z-index:9}
+.flash.erro{background:var(--erro)}
+@media(prefers-reduced-motion:no-preference){
+  .flash.pisca{animation:pisca .22s ease-out}
+  @keyframes pisca{from{opacity:.42}to{opacity:0}}
+}
+.recado{position:fixed;left:50%;transform:translateX(-50%);bottom:118px;z-index:10;
+        background:#0B141BEE;border:1px solid var(--linha);border-radius:20px;
+        padding:8px 16px;font-size:13.5px;opacity:0;transition:opacity .18s}
+.recado.ver{opacity:1}
+
+.quem{margin-top:9px;font-size:12.5px;color:var(--fraco);display:flex;gap:8px;align-items:center;
+      justify-content:center;flex-wrap:wrap}
+.link{background:none;border:none;padding:2px 4px;color:var(--etiqueta);font-size:inherit;text-decoration:underline}
+.conta-tela{position:fixed;inset:0;z-index:20;background:#101A24F2;display:flex;align-items:center;
+            justify-content:center;padding:18px}
+.conta-caixa{width:100%;max-width:380px;background:var(--painel);border:1px solid var(--linha);
+             border-radius:8px;padding:18px}
+.conta-caixa h2{margin:0 0 6px;font-size:17px}
+.conta-caixa p{margin:0 0 12px;font-size:14px;color:var(--fraco);line-height:1.45}
+.conta-caixa input{width:100%;padding:12px 13px;margin-bottom:9px;border-radius:6px;border:1px solid var(--linha);
+                   background:var(--fundo);color:var(--texto);font-size:16px}
+.conta-caixa input:focus{outline:2px solid var(--etiqueta);outline-offset:1px}
+.conta-caixa .forte{width:100%;padding:13px;margin-top:2px}
+.conta-erro{min-height:18px;font-size:13.5px;color:var(--erro);margin-bottom:6px}
+.conta-links{display:flex;justify-content:space-between;margin-top:10px;font-size:13.5px}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Coletor de etiquetas</h1>
+    <div class="rota">GODKS &rarr; KOS <span class="versao">v10</span></div>
+  </div>
+  <div class="contador"><span id="conta">0</span><small>lidas</small></div>
+</header>
+
+<div class="camera" id="camera">
+  <video id="video" playsinline muted autoplay></video>
+  <div class="mira" id="mira"></div>
+  <div class="ferramentas">
+    <button id="bt-luz" class="oculto">Luz</button>
+    <button id="bt-pausa">Pausar</button>
+  </div>
+  <div class="situacao" id="situacao">preparando a câmera</div>
+</div>
+<div class="manual">
+  <button id="bt-digitar">Digitar uma etiqueta</button>
+  <form id="form-manual" class="oculto">
+    <input id="campo-manual" inputmode="numeric" autocomplete="off"
+           placeholder="os 22 dígitos impressos sob o código">
+    <button class="forte" type="submit">Incluir</button>
+  </form>
+</div>
+
+<div class="aviso oculto" id="aviso"></div>
+
+<div class="ultima" id="ultima"><div class="nada">Aponte a câmera na primeira etiqueta.</div></div>
+
+<div class="lista">
+  <ol id="lista"></ol>
+  <div class="vazia" id="vazia">Nada lido ainda.</div>
+</div>
+
+<div class="saida oculto" id="saida">
+  <p>Selecione tudo e copie, ou mande esta tela pro PC do jeito que preferir.</p>
+  <textarea id="texto-saida" readonly rows="6"></textarea>
+  <button id="bt-fechar-saida">Fechar</button>
+</div>
+
+<div class="envio oculto" id="envio">
+  <p id="envio-texto"></p>
+  <input id="envio-campo" autocomplete="off">
+  <div class="envio-acoes">
+    <button id="bt-envio-cancelar">Cancelar</button>
+    <button class="forte" id="bt-envio-ok">Enviar</button>
+  </div>
+</div>
+
+<footer>
+  <button class="forte largo" id="bt-enviar" disabled>Enviar pro PC</button>
+  <div class="secundarios">
+    <button id="bt-copiar" disabled>Copiar</button>
+    <button id="bt-baixar" disabled>Arquivo</button>
+    <button id="bt-ver" disabled>Ver códigos</button>
+    <button id="bt-limpar" disabled>Limpar</button>
+  </div>
+  <div class="quem" id="quem"></div>
+</footer>
+
+<div class="conta-tela oculto" id="conta-tela">
+  <form class="conta-caixa" id="form-entrar">
+    <h2>Entrar</h2>
+    <p id="conta-texto">Use o e-mail de trabalho. Você só precisa entrar uma vez neste aparelho.</p>
+    <input id="conta-email" type="email" autocomplete="username" placeholder="e-mail" required>
+    <input id="conta-senha" type="password" autocomplete="current-password" placeholder="senha" required>
+    <div class="conta-erro" id="conta-erro"></div>
+    <button class="forte" type="submit" id="bt-entrar">Entrar</button>
+    <div class="conta-links">
+      <button type="button" class="link" id="bt-esqueci">Esqueci a senha</button>
+      <button type="button" class="link" id="bt-depois">Agora não</button>
+    </div>
+  </form>
+  <form class="conta-caixa oculto" id="form-nova">
+    <h2>Senha nova</h2>
+    <p>Escolha a senha nova, com pelo menos 8 caracteres. Depois é só usar ela no celular e no PC.</p>
+    <input id="nova-senha" type="password" autocomplete="new-password" placeholder="senha nova" minlength="8" required>
+    <input id="nova-senha2" type="password" autocomplete="new-password" placeholder="repita a senha nova" minlength="8" required>
+    <div class="conta-erro" id="nova-erro"></div>
+    <button class="forte" type="submit" id="bt-nova">Salvar a senha</button>
+  </form>
+</div>
+
+<div class="flash" id="flash"></div>
+<div class="recado" id="recado"></div>
+
+<script>
+/* ---------- conta e banco (Supabase, projeto conferencia-etiquetas) ----------
+   A chave abaixo é a "publishable": foi feita para ficar à vista no código.
+   Sozinha ela não lê nem grava nada. As tabelas só respondem a quem entrou
+   com e-mail e senha E está na lista de autorizados do banco (só você).
+   A sessão fica guardada neste navegador e se renova sozinha. */
+const Conta = (() => {
+  const BASE  = 'https://prbfjlclzopmzfybhliq.supabase.co';
+  const CHAVE = 'sb_publishable_ZJJM0Aaoe2LX4l5D8UQuyQ_m8iJfL-7';
+  const LOCAL = 'conferencia-sessao-v1';
+
+  const ler = () => { try { return JSON.parse(localStorage.getItem(LOCAL)) || null; } catch (e) { return null; } };
+  let s = ler();
+  function guardar(n) {
+    s = n;
+    try { n ? localStorage.setItem(LOCAL, JSON.stringify(n)) : localStorage.removeItem(LOCAL); } catch (e) {}
+  }
+  const daResposta = (j, email) => ({
+    access: j.access_token, refresh: j.refresh_token,
+    expira: j.expires_at ? j.expires_at * 1000 : Date.now() + (j.expires_in || 3600) * 1000,
+    email: (j.user && j.user.email) || email || null
+  });
+
+  function traduzir(j, st) {
+    const c = j.error_code || j.code || '';
+    const m = j.msg || j.message || j.error_description || j.error || '';
+    if (c === 'invalid_credentials' || /invalid login/i.test(m)) return 'E-mail ou senha errados.';
+    if (c === 'email_not_confirmed') return 'Esse e-mail ainda não foi confirmado.';
+    if (/rate_limit/.test(c) || st === 429) return 'Muitas tentativas seguidas. Espere alguns minutos e tente de novo.';
+    if (/refresh_token|session_not_found|bad_jwt/.test(c)) return 'A sessão expirou. Entre de novo.';
+    if (c === 'same_password') return 'A senha nova é igual à antiga.';
+    if (c === 'weak_password') return 'Senha fraca. Use uma mais longa.';
+    if (c === 'user_banned') return 'Este usuário está bloqueado no Supabase.';
+    return m || ('erro ' + st);
+  }
+
+  async function auth(caminho, corpo, { metodo = 'POST', token } = {}) {
+    let r;
+    try {
+      r = await fetch(BASE + '/auth/v1/' + caminho, {
+        method: metodo,
+        headers: Object.assign({ apikey: CHAVE, 'Content-Type': 'application/json' },
+                               token ? { Authorization: 'Bearer ' + token } : {}),
+        body: metodo === 'GET' ? undefined : JSON.stringify(corpo || {})
+      });
+    } catch (e) { throw semInternet(); }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error(traduzir(j, r.status)); e.status = r.status; e.codigo = j.error_code || j.code; throw e; }
+    return j;
+  }
+  function semInternet() { const e = new Error('Sem internet agora. Confira a conexão e tente de novo.'); e.rede = true; return e; }
+  function semSessao() { const e = new Error('Entre com o e-mail de trabalho.'); e.semSessao = true; return e; }
+
+  /* Duas abas abertas dividem a mesma sessão: se a outra já renovou, uso a dela. */
+  let renovando = null;
+  function renovar() {
+    const atual = ler();
+    if (atual && s && atual.refresh !== s.refresh) {
+      s = atual;
+      if (s.expira - Date.now() > 60000) return Promise.resolve();
+    }
+    if (!s) return Promise.reject(semSessao());
+    if (!renovando) {
+      renovando = auth('token?grant_type=refresh_token', { refresh_token: s.refresh })
+        .then(j => guardar(daResposta(j, s && s.email)))
+        .catch(e => {
+          if (!e.rede) { guardar(null); aoSair.forEach(f => f()); }   // sessão recusada: pede login de novo
+          throw e;
+        })
+        .finally(() => { renovando = null; });
+    }
+    return renovando;
+  }
+
+  async function token() {
+    if (!s) throw semSessao();
+    if (s.expira - Date.now() < 60000) await renovar();
+    if (!s) throw semSessao();
+    return s.access;
+  }
+
+  /* Chamada às tabelas. Devolve o JSON, ou null quando a resposta vem vazia. */
+  async function api(caminho, opcoes = {}) {
+    const vai = async () => {
+      const tk = await token();
+      try {
+        return await fetch(BASE + '/rest/v1/' + caminho, Object.assign({}, opcoes, {
+          headers: Object.assign({ apikey: CHAVE, Authorization: 'Bearer ' + tk,
+                                   'Content-Type': 'application/json' }, opcoes.headers || {})
+        }));
+      } catch (e) { throw semInternet(); }
+    };
+    let r = await vai();
+    if (r.status === 401) { await renovar(); r = await vai(); }
+    const texto = await r.text();
+    let j = null; try { j = texto ? JSON.parse(texto) : null; } catch (e) {}
+    if (!r.ok) {
+      const negado = r.status === 401 || r.status === 403 || (j && j.code === '42501');
+      const e = new Error(negado
+        ? 'O banco recusou. Confira se você entrou com o e-mail de trabalho.'
+        : `${r.status} ${(j && j.message) || texto.slice(0, 160)}`);
+      e.status = r.status; e.negado = negado; throw e;
+    }
+    return j;
+  }
+
+  /* Lê a tabela inteira, de mil em mil linhas (o banco entrega no máximo mil por vez). */
+  async function todos(caminho) {
+    const saida = [];
+    for (let de = 0; ; de += 1000) {
+      const parte = await api(caminho, { headers: { Range: `${de}-${de + 999}`, 'Range-Unit': 'items' } });
+      saida.push(...(parte || []));
+      if (!parte || parte.length < 1000) return saida;
+    }
+  }
+
+  async function entrar(email, senha) {
+    guardar(daResposta(await auth('token?grant_type=password', { email, password: senha }), email));
+    aoEntrar.forEach(f => f());
+  }
+  async function sair() {
+    const tk = s && s.access;
+    guardar(null);
+    aoSair.forEach(f => f());
+    if (tk) try { await auth('logout', {}, { token: tk }); } catch (e) {}
+  }
+  function esqueci(email) {
+    return auth('recover?redirect_to=' + encodeURIComponent(location.origin + location.pathname), { email });
+  }
+  async function trocarSenha(nova) {
+    await auth('user', { password: nova }, { metodo: 'PUT', token: await token() });
+  }
+
+  /* Volta do link "esqueci a senha" do e-mail: a sessão vem no endereço. */
+  function lerRetorno() {
+    if (!location.hash || location.hash.length < 2) return null;
+    const h = new URLSearchParams(location.hash.slice(1));
+    const limpar = () => history.replaceState(null, '', location.pathname + location.search);
+    if (h.get('error_description') || h.get('error')) {
+      limpar();
+      return { erro: /expired|invalid/i.test(h.get('error_code') || h.get('error_description') || '')
+        ? 'O link do e-mail expirou ou já foi usado. Peça outro em "Esqueci a senha".'
+        : (h.get('error_description') || h.get('error')) };
+    }
+    if (!h.get('access_token') || !h.get('refresh_token')) return null;
+    guardar(daResposta({ access_token: h.get('access_token'), refresh_token: h.get('refresh_token'),
+                         expires_at: Number(h.get('expires_at')) || 0, expires_in: Number(h.get('expires_in')) || 3600 }));
+    limpar();
+    auth('user', null, { metodo: 'GET', token: s.access })
+      .then(u => { if (s && u && u.email) guardar(Object.assign({}, s, { email: u.email })); }).catch(() => {});
+    return { tipo: h.get('type') };
+  }
+
+  const aoEntrar = [], aoSair = [];
+  return {
+    api, todos, entrar, sair, esqueci, trocarSenha, lerRetorno,
+    get logado() { return !!s; },
+    get email() { return s && s.email; },
+    aoEntrar: f => aoEntrar.push(f),
+    aoSair: f => aoSair.push(f)
+  };
+})();
+</script>
+<script>
+(function(){
+'use strict';
+const $ = id => document.getElementById(id);
+const CHAVE = 'coletor-etiquetas-v1';
+const REPETE_MS = 2500;      // mesma etiqueta parada na frente da câmera
+
+let lidas = [];
+
+/* Cadastro KOS: baixado do banco depois do login e guardado no aparelho,
+   para continuar mostrando os nomes sem internet. */
+const CADASTRO_LOCAL = 'coletor-cadastro-v1';
+let cadastro = {};
+try { cadastro = (JSON.parse(localStorage.getItem(CADASTRO_LOCAL)) || {}).mapa || {}; } catch (e) { cadastro = {}; }
+const temCadastro = () => Object.keys(cadastro).length > 0;
+const nomeDe = l => cadastro[l.produto] || l.nome || null;
+const ehKos  = l => temCadastro() ? !!cadastro[l.produto] : !!l.kos;
+let ultimoCod = null, ultimoEm = 0;
+let detector = null, trilha = null, rodando = false, pausado = false;
+
+/* ---------- persistência ---------- */
+try { lidas = JSON.parse(localStorage.getItem(CHAVE) || '[]'); } catch (e) { lidas = []; }
+function guardar(){ try { localStorage.setItem(CHAVE, JSON.stringify(lidas)); } catch(e){} }
+
+/* ---------- etiqueta: OP(6) + produto(7) + doc(5) + qtd(4) = 22 ---------- */
+const DIGITOS = 22;
+function partir(cod){
+  if (cod.length < 19) return null;
+  return { cod, op: cod.slice(0,6), produto: cod.slice(6,13),
+           doc: cod.slice(13,18).padStart(6,'0'), qtd: parseInt(cod.slice(18),10) };
+}
+
+/* ---------- feedback ---------- */
+function piscar(erro){
+  const f = $('flash');
+  f.className = 'flash' + (erro ? ' erro' : '');
+  void f.offsetWidth; f.classList.add('pisca');
+  setTimeout(() => f.classList.remove('pisca'), 260);
+}
+function vibrar(ms){ try { navigator.vibrate && navigator.vibrate(ms); } catch(e){} }
+let ultimaSituacao = '';
+function situacao(txt){
+  if (txt === ultimaSituacao) return;
+  ultimaSituacao = txt;
+  const e = $('situacao'); if (e) e.textContent = txt;
+}
+
+let recadoTimer = null;
+function recado(txt){
+  const r = $('recado'); r.textContent = txt; r.classList.add('ver');
+  clearTimeout(recadoTimer); recadoTimer = setTimeout(() => r.classList.remove('ver'), 1700);
+}
+
+/* ---------- registrar leitura ---------- */
+function registrar(bruto, fonte){
+  const cod = String(bruto).replace(/\D/g, '');
+  const agora = Date.now();
+
+  if (cod === ultimoCod && agora - ultimoEm < REPETE_MS) { ultimoEm = agora; return; }
+  ultimoCod = cod; ultimoEm = agora;
+
+  /* A etiqueta de apontamento tem 22 dígitos: OP(6) + produto(7) + doc(5) +
+     quantidade(4). Leitura parcial sempre encurta, então recuso da câmera o
+     que vier com menos de 22. Acima disso pode ser quantidade de cinco
+     dígitos numa etiqueta legítima, e aí deixo passar marcada para conferir.
+     Digitado à mão aceito qualquer tamanho, porque a intenção é sua. */
+  if (fonte === 'camera' && (cod.length < DIGITOS || cod.length > DIGITOS + 2)) {
+    piscar(true); vibrar([70,60,70]);
+    recado(cod.length < DIGITOS
+      ? `Leitura parcial (${cod.length} díg.), passe de novo`
+      : `Código estranho (${cod.length} díg.), passe de novo`);
+    return;
+  }
+
+  const et = partir(cod);
+  if (!et) { piscar(true); vibrar([70,60,70]); recado('Código incompleto, passe de novo'); return; }
+
+  if (lidas.some(l => l.cod === cod)) {
+    piscar(true); vibrar([70,60,70]); recado('Essa etiqueta já foi lida');
+    return;
+  }
+
+  et.nome = cadastro[et.produto] || null;
+  et.kos = !!cadastro[et.produto];
+  /* toda etiqueta sua tem 22 dígitos; fora disso pode ser leitura parcial */
+  et.suspeita = cod.length !== DIGITOS;
+  et.quando = new Date().toISOString();
+  lidas.push(et);
+  travadoAte = Date.now() + 250;   // evita disparar em rajada ao mover o celular
+  candidato = null; confirmacoes = 0;
+  guardar(); pintar();
+  if (et.suspeita) { piscar(true); vibrar([70,60,70]); recado(`Leitura de ${cod.length} dígitos, confira essa`); }
+  else { piscar(false); vibrar(55); }
+}
+
+/* ---------- tela ---------- */
+function pintar(){
+  $('conta').textContent = lidas.length;
+  $('vazia').style.display = lidas.length ? 'none' : '';
+  ['bt-enviar','bt-copiar','bt-baixar','bt-ver','bt-limpar'].forEach(b => $(b).disabled = !lidas.length);
+
+  const u = lidas[lidas.length - 1];
+  $('ultima').innerHTML = u ? `
+      <div class="nome">${esc(nomeDe(u) || 'Produto ' + u.produto)}
+        <span class="tag ${ehKos(u) ? 'kos' : 'godks'}">${ehKos(u) ? 'KOS' : 'GODKS'}</span></div>
+      <div class="meta"><span>${esc(u.produto)}</span><span>doc ${esc(u.doc)}</span>
+        <span>${u.qtd} un</span></div>`
+    : '<div class="nada">Aponte a câmera na primeira etiqueta.</div>';
+
+  $('lista').innerHTML = lidas.slice().reverse().map((l, i) => {
+      const pos = lidas.length - i;
+      return `<li><span class="pos">${pos}</span>
+          <span class="doc">${esc(l.doc)}</span>
+          <span class="nm">${esc(nomeDe(l) || l.produto)}</span>
+          <span class="tag ${l.suspeita ? 'suspeita' : ehKos(l) ? 'kos' : 'godks'}">${
+            l.suspeita ? 'CONFERIR' : ehKos(l) ? 'KOS' : 'GODKS'}</span>
+          <button class="excluir" data-pos="${pos - 1}" aria-label="Excluir a ${pos}ª">&times;</button></li>`;
+    }).join('');
+}
+
+function excluir(i){
+  const l = lidas[i];
+  if (!l) return;
+  lidas.splice(i, 1);
+  ultimoCod = null; candidato = null; confirmacoes = 0;
+  guardar(); pintar();
+  recado('Excluída: doc ' + l.doc);
+}
+
+$('lista').addEventListener('click', ev => {
+  const b = ev.target.closest('.excluir');
+  if (b) excluir(+b.dataset.pos);
+});
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ---------- câmera ---------- */
+async function ligar(){
+  if (!('BarcodeDetector' in window)) {
+    mostrarAviso('<b>Este navegador não lê código de barras.</b> Use o Chrome do Android, que tem o leitor nativo. ' +
+                 'No iPhone não funciona. Se já estiver no Chrome, atualize o app Serviços do Google Play.');
+    return;
+  }
+  const formatos = await BarcodeDetector.getSupportedFormats();
+  if (!formatos.includes('code_128')) {
+    mostrarAviso('<b>Este aparelho não decodifica Code 128</b>, que é o tipo das suas etiquetas. Formatos disponíveis: ' + formatos.join(', '));
+    return;
+  }
+  detector = new BarcodeDetector({ formats: ['code_128'] });
+
+  let fluxo;
+  try {
+    fluxo = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' },
+               width: { ideal: 1920 }, height: { ideal: 1080 } } });
+  } catch (err) {
+    mostrarAviso('<b>Não consegui abrir a câmera:</b> ' + esc(err.message) +
+                 '<br><br>Toque no cadeado ao lado do endereço e libere a câmera para esta página.');
+    return;
+  }
+
+  const v = $('video'); v.srcObject = fluxo; await v.play();
+  trilha = fluxo.getVideoTracks()[0];
+
+  const cap = trilha.getCapabilities ? trilha.getCapabilities() : {};
+  if (cap.torch) {
+    $('bt-luz').classList.remove('oculto');
+    let aceso = false;
+    $('bt-luz').onclick = async () => {
+      aceso = !aceso;
+      try { await trilha.applyConstraints({ advanced: [{ torch: aceso }] });
+            $('bt-luz').textContent = aceso ? 'Apagar' : 'Luz'; } catch(e){}
+    };
+  }
+  try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch(e){}
+
+  rodando = true; laco();
+}
+
+function mostrarAviso(html){
+  $('aviso').innerHTML = html; $('aviso').classList.remove('oculto');
+  $('camera').classList.add('oculto');
+}
+
+/* Numa folha de 9 etiquetas a câmera enxerga as vizinhas, e ao passar de uma
+   para a outra cada uma vira a mais central por um instante. Só vale o código
+   cujo centro cai dentro da mira desenhada na tela, e que esteja perto o
+   bastante para ocupar boa parte dela. Converto a mira, que está em pixels de
+   tela, para as coordenadas do vídeo, lembrando que o object-fit: cover corta
+   as bordas. */
+const OCUPACAO_MIN = 0.26;   // largura do código sobre a largura da mira
+
+function regiaoDaMira(){
+  const v = $('video'), cam = $('camera'), mira = $('mira');
+  if (!v.videoWidth || !v.videoHeight) return null;
+  const cw = cam.clientWidth, ch = cam.clientHeight;
+  if (!cw || !ch) return null;
+  const escala = Math.max(cw / v.videoWidth, ch / v.videoHeight);
+  const rc = cam.getBoundingClientRect(), rm = mira.getBoundingClientRect();
+  const mx = (rm.left - rc.left) + rm.width / 2;
+  const my = (rm.top - rc.top) + rm.height / 2;
+  return {
+    cx: v.videoWidth / 2 + (mx - cw / 2) / escala,
+    cy: v.videoHeight / 2 + (my - ch / 2) / escala,
+    hw: (rm.width / 2) / escala,
+    hh: (rm.height / 2) / escala
+  };
+}
+
+function naMira(achados){
+  const r = regiaoDaMira();
+  if (!r) return { valor: null, motivo: 'camera' };
+  if (!achados.length) return { valor: null, motivo: 'vazio' };
+
+  let melhor = null, menor = Infinity, motivo = 'fora';
+  for (const a of achados) {
+    if (!a.rawValue || !a.boundingBox) continue;
+    const b = a.boundingBox;
+    const bx = b.x + b.width / 2, by = b.y + b.height / 2;
+    if (Math.abs(bx - r.cx) > r.hw || Math.abs(by - r.cy) > r.hh) continue;
+    if (b.width < r.hw * 2 * OCUPACAO_MIN) {           // longe demais
+      if (motivo === 'fora') motivo = 'longe';
+      continue;
+    }
+    const d = Math.hypot((bx - r.cx) / r.hw, (by - r.cy) / r.hh);
+    if (d < menor) { menor = d; melhor = a.rawValue; }
+  }
+  return melhor ? { valor: melhor, motivo: 'ok' } : { valor: null, motivo };
+}
+
+const RECADOS = {
+  camera: 'preparando a câmera',
+  vazio:  'nenhum código no quadro',
+  fora:   'traga o código pra dentro da mira',
+  longe:  'aproxime, o código está pequeno',
+  ok:     'lendo'
+};
+
+/* Leitura parcial de Code 128 às vezes passa pelo dígito verificador.
+   Só aceito depois de ler o mesmo código em dois quadros seguidos. */
+let candidato = null, confirmacoes = 0;
+function confirmar(cod){
+  if (cod === candidato) confirmacoes++;
+  else { candidato = cod; confirmacoes = 1; }
+  if (confirmacoes >= 2) { confirmacoes = 0; registrar(cod, 'camera'); }
+}
+
+let travadoAte = 0;   // respiro depois de cada leitura aceita
+
+async function laco(){
+  if (!rodando) return;
+  if (!pausado && Date.now() >= travadoAte) {
+    try {
+      const r = naMira(await detector.detect($('video')));
+      $('mira').classList.toggle('pegou', !!r.valor);
+      situacao(RECADOS[r.motivo] || r.motivo);
+      if (r.valor) confirmar(r.valor);
+      else { candidato = null; confirmacoes = 0; }
+    } catch (e) { situacao('erro: ' + e.message); }
+  }
+  setTimeout(() => requestAnimationFrame(laco), 55);
+}
+
+$('bt-pausa').onclick = () => {
+  pausado = !pausado;
+  $('bt-pausa').textContent = pausado ? 'Continuar' : 'Pausar';
+  $('camera').style.opacity = pausado ? .45 : 1;
+};
+
+/* ---------- entrada manual ---------- */
+$('bt-digitar').onclick = () => {
+  $('bt-digitar').classList.add('oculto');
+  $('form-manual').classList.remove('oculto');
+  $('campo-manual').focus();
+};
+$('form-manual').onsubmit = ev => {
+  ev.preventDefault();
+  const v = $('campo-manual').value.replace(/\D/g, '');
+  if (!v) return;
+  ultimoCod = null;                 // digitada vale mesmo se acabou de ser lida
+  registrar(v, 'manual');
+  $('campo-manual').value = '';
+  $('campo-manual').focus();
+};
+
+/* ---------- envio pro PC ----------
+   O lote vai para a tabela "lotes", que só aceita quem entrou com o e-mail
+   de trabalho. A chave colada à mão da versão antiga é apagada do aparelho. */
+try { localStorage.removeItem('coletor-chave-v1'); } catch (e) {}
+let aguardando = null;   // o que fazer quando o painel de envio for confirmado
+
+function pedir(texto, valorInicial, aoConfirmar, { semCampo = false, rotuloOk = 'Enviar' } = {}){
+  $('envio-texto').textContent = texto;
+  $('envio-campo').value = valorInicial || '';
+  $('envio-campo').classList.toggle('oculto', semCampo);
+  $('bt-envio-ok').textContent = rotuloOk;
+  $('envio').classList.remove('oculto');
+  aguardando = aoConfirmar;
+  if (!semCampo) { $('envio-campo').focus(); $('envio-campo').select(); }
+}
+$('bt-envio-cancelar').onclick = () => { $('envio').classList.add('oculto'); aguardando = null; };
+$('bt-envio-ok').onclick = () => {
+  const v = $('envio-campo').value.trim();
+  $('envio').classList.add('oculto');
+  const f = aguardando; aguardando = null;
+  if (f) f(v);
+};
+$('envio-campo').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter') { ev.preventDefault(); $('bt-envio-ok').click(); }
+});
+
+function nomeSugerido(){
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth()+1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+async function enviarLote(nome){
+  await Conta.api('lotes', {
+    method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ nome: nome.slice(0, 80), codigos: lidas.map(l => l.cod) })
+  });
+}
+
+function enviar(){
+  pedir(`Dê um nome a este lote de ${lidas.length} etiqueta(s). É por ele que você vai achar no PC.`,
+        nomeSugerido(), async nome => {
+    if (!nome) return;
+    $('bt-enviar').disabled = true; $('bt-enviar').textContent = 'Enviando...';
+    try {
+      await enviarLote(nome);
+      $('bt-enviar').textContent = 'Enviar de novo';
+      recado(`Lote "${nome}" enviado`);
+      vibrar([40,50,40]);
+    } catch (e) {
+      $('bt-enviar').textContent = 'Enviar pro PC';
+      if (e.semSessao || !Conta.logado) { abrirConta('A sessão expirou. Entre de novo para enviar o lote.', enviar); return; }
+      pedir('Não consegui enviar: ' + e.message + ' As leituras continuam guardadas aqui.',
+            '', () => enviar(), { semCampo: true, rotuloOk: 'Tentar de novo' });
+    } finally { $('bt-enviar').disabled = !lidas.length; }
+  });
+}
+$('bt-enviar').onclick = () => Conta.logado ? enviar() : abrirConta('Entre para enviar o lote pro PC.', enviar);
+
+/* ---------- conta ---------- */
+let depoisDeEntrar = null;
+function abrirConta(texto, depois){
+  depoisDeEntrar = depois || null;
+  $('form-nova').classList.add('oculto');
+  $('form-entrar').classList.remove('oculto');
+  $('conta-texto').textContent = texto || 'Use o e-mail de trabalho. Você só precisa entrar uma vez neste aparelho.';
+  $('conta-erro').textContent = '';
+  $('conta-tela').classList.remove('oculto');
+  setTimeout(() => ($('conta-email').value ? $('conta-senha') : $('conta-email')).focus(), 50);
+}
+function fecharConta(){ $('conta-tela').classList.add('oculto'); $('conta-senha').value = ''; }
+
+$('form-entrar').onsubmit = async ev => {
+  ev.preventDefault();
+  const b = $('bt-entrar');
+  b.disabled = true; b.textContent = 'Entrando...'; $('conta-erro').textContent = '';
+  try {
+    await Conta.entrar($('conta-email').value.trim(), $('conta-senha').value);
+    fecharConta(); pintarConta(); recado('Pronto, conectado');
+    baixarCadastro();
+    const f = depoisDeEntrar; depoisDeEntrar = null; if (f) f();
+  } catch (e) { $('conta-erro').textContent = e.message; }
+  finally { b.disabled = false; b.textContent = 'Entrar'; }
+};
+$('bt-depois').onclick = () => { depoisDeEntrar = null; fecharConta(); };
+$('bt-esqueci').onclick = async () => {
+  const email = $('conta-email').value.trim();
+  if (!email) { $('conta-erro').textContent = 'Digite o e-mail primeiro.'; $('conta-email').focus(); return; }
+  try {
+    await Conta.esqueci(email);
+    $('conta-erro').textContent = '';
+    $('conta-texto').textContent = 'Mandei um link para ' + email + '. Abra o e-mail neste aparelho e toque no link para escolher a senha nova.';
+  } catch (e) { $('conta-erro').textContent = e.message; }
+};
+$('form-nova').onsubmit = async ev => {
+  ev.preventDefault();
+  const a = $('nova-senha').value, b = $('nova-senha2').value;
+  if (a !== b) { $('nova-erro').textContent = 'As duas senhas não são iguais.'; return; }
+  $('bt-nova').disabled = true;
+  try {
+    await Conta.trocarSenha(a);
+    $('form-nova').classList.add('oculto'); fecharConta(); pintarConta(); recado('Senha trocada');
+    baixarCadastro();
+  } catch (e) { $('nova-erro').textContent = e.message; }
+  finally { $('bt-nova').disabled = false; }
+};
+
+function pintarConta(){
+  const q = $('quem');
+  q.innerHTML = Conta.logado
+    ? `<span>${esc(Conta.email || 'conectado')}</span><button class="link" id="bt-sair">Sair</button>`
+    : `<span>não conectado</span><button class="link" id="bt-conta">Entrar</button>`;
+  const s = $('bt-sair'), c = $('bt-conta');
+  if (s) s.onclick = () => {
+    if (!confirm('Sair desta conta neste aparelho? As leituras continuam guardadas aqui.')) return;
+    Conta.sair();
+  };
+  if (c) c.onclick = () => abrirConta();
+}
+Conta.aoSair(() => pintarConta());
+
+async function baixarCadastro(){
+  try {
+    const linhas = await Conta.todos('cadastro?select=codigo_godks,descricao&order=codigo_godks');
+    if (!linhas.length) { recado('Seu usuário não está liberado no banco'); return; }
+    cadastro = Object.fromEntries(linhas.map(l => [l.codigo_godks, l.descricao]));
+    try { localStorage.setItem(CADASTRO_LOCAL, JSON.stringify({ quando: Date.now(), mapa: cadastro })); } catch (e) {}
+    pintar();
+  } catch (e) { /* sem internet: fica com o cadastro guardado */ }
+}
+
+/* ---------- saída ---------- */
+function texto(){ return lidas.map(l => l.cod).join('\n'); }
+
+$('bt-copiar').onclick = async () => {
+  const t = texto();
+  try { await navigator.clipboard.writeText(t); recado(lidas.length + ' códigos copiados'); }
+  catch (e) {
+    const a = document.createElement('textarea');
+    a.value = t; document.body.appendChild(a); a.select();
+    try { document.execCommand('copy'); recado(lidas.length + ' códigos copiados'); }
+    catch (e2) { a.remove(); $('bt-ver').click(); return; }
+    a.remove();
+  }
+};
+
+/* Dentro do visualizador de artefato o download passa pela permissão da página;
+   fora dele, o link comum resolve. Tento o primeiro e caio no segundo. */
+let baixador = null;
+if (window.claude && claude.use) {
+  claude.use('downloads').then(d => { baixador = d; }).catch(() => {});
+}
+$('bt-baixar').onclick = async () => {
+  const nome = `etiquetas-${new Date().toISOString().slice(0,10)}.txt`;
+  if (baixador) {
+    try { await baixador.save({ filename: nome, data: texto() }); recado('Arquivo salvo'); return; }
+    catch (e) { recado('Download recusado, use Ver códigos'); return; }
+  }
+  const blob = new Blob([texto()], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nome;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+};
+
+$('bt-ver').onclick = () => {
+  $('texto-saida').value = texto();
+  $('saida').classList.remove('oculto');
+  $('texto-saida').focus(); $('texto-saida').select();
+};
+$('bt-fechar-saida').onclick = () => $('saida').classList.add('oculto');
+
+$('bt-limpar').onclick = () => {
+  if (!confirm(`Apagar as ${lidas.length} leituras? Faça isso só depois de levar os códigos pro PC.`)) return;
+  lidas = []; ultimoCod = null; guardar(); pintar();
+  recado('Lista limpa');
+};
+
+const retorno = Conta.lerRetorno();
+pintar();
+pintarConta();
+if (retorno && retorno.erro) abrirConta(retorno.erro);
+else if (retorno && retorno.tipo === 'recovery') {
+  $('form-entrar').classList.add('oculto'); $('form-nova').classList.remove('oculto');
+  $('conta-tela').classList.remove('oculto'); setTimeout(() => $('nova-senha').focus(), 50);
+} else if (Conta.logado) baixarCadastro();
+else abrirConta();
+ligar();
+})();
+</script>
+</body>
+</html>
