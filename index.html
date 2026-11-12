@@ -12,7 +12,7 @@
 :root{
   --fundo:#101A24; --painel:#17242F; --linha:#2A3B4A;
   --texto:#EEF4F8; --fraco:#93A8B8; --etiqueta:#1B9FD8;
-  --ok:#36C07E; --kos:#1B9FD8; --erro:#F2645F;
+  --ok:#36C07E; --kos:#1B9FD8; --erro:#F2645F; --atencao:#F0B84B;
   --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
   --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
 }
@@ -110,14 +110,30 @@ footer .secundarios button{flex:1;padding:10px 5px;font-size:13px}
 
 .flash{position:fixed;inset:0;background:var(--ok);opacity:0;pointer-events:none;z-index:9}
 .flash.erro{background:var(--erro)}
+.flash.atencao{background:var(--atencao)}
 @media(prefers-reduced-motion:no-preference){
   .flash.pisca{animation:pisca .22s ease-out}
   @keyframes pisca{from{opacity:.42}to{opacity:0}}
 }
-.recado{position:fixed;left:50%;transform:translateX(-50%);bottom:118px;z-index:10;
+.recado{position:fixed;left:50%;transform:translateX(-50%);bottom:156px;z-index:10;
         background:#0B141BEE;border:1px solid var(--linha);border-radius:20px;
         padding:8px 16px;font-size:13.5px;opacity:0;transition:opacity .18s}
 .recado.ver{opacity:1}
+
+.contra{display:flex;align-items:center;gap:9px;padding:7px 15px;border-bottom:1px solid var(--linha);
+        font-size:12.5px;color:var(--fraco);background:#0D161F}
+.contra span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.contra b{color:var(--texto);font-weight:600}
+.contra button{padding:5px 10px;font-size:12.5px}
+.veredito{margin-top:6px;font-size:14.5px;font-weight:650}
+.veredito.ok{color:var(--ok)} .veredito.atencao{color:var(--atencao)} .veredito.erro{color:var(--erro)}
+.motivo{font-size:13px;color:var(--fraco);margin-top:3px;line-height:1.4}
+.ultima.erro{background:#F2645F14} .ultima.atencao{background:#F0B84B12}
+.lista li{flex-wrap:wrap}
+.lista li .bola{flex:none;width:9px;height:9px;border-radius:50%;align-self:center;background:var(--linha)}
+.lista li .bola.ok{background:var(--ok)} .lista li .bola.atencao{background:var(--atencao)} .lista li .bola.erro{background:var(--erro)}
+.lista li .mot{flex-basis:100%;padding-left:53px;font-size:12px;line-height:1.35;margin-top:-2px}
+.mot.atencao{color:var(--atencao)} .mot.erro{color:var(--erro)}
 
 .quem{margin-top:9px;font-size:12.5px;color:var(--fraco);display:flex;gap:8px;align-items:center;
       justify-content:center;flex-wrap:wrap}
@@ -141,15 +157,18 @@ footer .secundarios button{flex:1;padding:10px 5px;font-size:13px}
 <header>
   <div>
     <h1>Coletor de etiquetas</h1>
-    <div class="rota">GODKS &rarr; KOS <span class="versao">v11</span></div>
+    <div class="rota">GODKS &rarr; KOS <span class="versao">v12</span></div>
   </div>
   <div class="contador"><span id="conta">0</span><small>lidas</small></div>
 </header>
+
+<div class="contra oculto" id="contra"><span id="contra-texto"></span><button id="bt-atualizar">Atualizar</button></div>
 
 <div class="camera" id="camera">
   <video id="video" playsinline muted autoplay></video>
   <div class="mira" id="mira"></div>
   <div class="ferramentas">
+    <button id="bt-som">Som</button>
     <button id="bt-luz" class="oculto">Luz</button>
     <button id="bt-pausa">Pausar</button>
   </div>
@@ -225,6 +244,395 @@ footer .secundarios button{flex:1;padding:10px 5px;font-size:13px}
 <div class="flash" id="flash"></div>
 <div class="recado" id="recado"></div>
 
+<script>/* ============================================================
+   Núcleo da conferência de etiquetas — GODKS / KOS
+   Sem dependência de DOM: testável no Node e reusado no app.
+   ============================================================ */
+
+const RX_PRODUTO   = /PRODUTO:\s*(\d{4,9})\s+(.*?)\s+UNID:/;
+const RX_EMISSAO   = /DATA[-\s]+(\d{2})\/(\d{2})\/(\d{2,4})/;
+const RX_APONT     = /^\s*(\d{2})\s+(\d{1,8})\s+SCANER\s+(\d{1,8})\s/;
+const RX_TRANSF    = /^\s*(\d{2})\s+(\d{1,8})\s+KOS\s+0793\s+INVENTARIO/;
+const RX_VALOR     = /\d[\d.]*,\d{5}-?/g;
+
+/* Converte "1.234,50000" -> 1234.5 ; "300,00000-" -> -300 */
+function paraNumero(tok) {
+  const neg = tok.endsWith('-');
+  const n = parseFloat(tok.replace(/-$/, '').replace(/\./g, '').replace(',', '.'));
+  return neg ? -n : n;
+}
+
+/* O saldo é sempre o último valor decimal da linha (depois dos 5 almoxarifados) */
+function quantidadeDaLinha(linha) {
+  const vals = linha.match(RX_VALOR);
+  if (!vals || !vals.length) return null;
+  return Math.abs(paraNumero(vals[vals.length - 1]));
+}
+
+/* ------------------------------------------------------------
+   Leitura do relatório de movimentação
+   ------------------------------------------------------------ */
+function ordDoDia(ano, mes, dia) { return Math.round(Date.UTC(ano, mes - 1, dia) / 86400000); }
+
+function lerRelatorio(linhas, opcoes = {}) {
+  const produtos = new Map();
+  const movimentos = [];
+  let emissao = null;
+  let atual = null;
+
+  for (const linha of linhas) {
+    if (!emissao) {
+      const e = linha.match(RX_EMISSAO);
+      if (e) {
+        let ano = parseInt(e[3], 10);
+        if (ano < 100) ano += 2000;
+        emissao = { dia: +e[1], mes: +e[2], ano };
+      }
+    }
+
+    const p = linha.match(RX_PRODUTO);
+    if (p) {
+      atual = p[1];
+      if (!produtos.has(atual)) {
+        produtos.set(atual, { codigo: atual, descricao: p[2].trim(), apontamentos: [], transferencias: [] });
+      }
+      continue;
+    }
+    if (!atual) continue;
+
+    const a = linha.match(RX_APONT);
+    if (a) {
+      const qtd = quantidadeDaLinha(linha);
+      if (qtd === null) continue;
+      const mv = { dia: +a[1], doc: a[2].padStart(6, '0'), op: a[3].padStart(6, '0'), qtd };
+      produtos.get(atual).apontamentos.push(mv); movimentos.push(mv);
+      continue;
+    }
+
+    const t = linha.match(RX_TRANSF);
+    if (t) {
+      const qtd = quantidadeDaLinha(linha);
+      if (qtd === null) continue;
+      const mv = { dia: +t[1], doc: t[2].padStart(6, '0'), qtd };
+      produtos.get(atual).transferencias.push(mv); movimentos.push(mv);
+    }
+  }
+
+  /* Mês do movimento: o relatório só imprime o dia.
+     O ERP só puxa período dentro de um mês, então o relatório inteiro é de
+     um mês só. Não existe movimento no futuro: se algum dia passa do dia da
+     emissão, o relatório todo é do mês anterior; senão, é do mês da emissão.
+     opcoes.mesesAtras desloca tudo, para o relatório emitido bem depois.
+     Cada linha ganha a data completa, e os prazos são contados em dias de
+     calendário. */
+  const mesesAtras = opcoes.mesesAtras || 0;
+  let mes = null, ano = null, deduzido = null, inicio = null, fim = null;
+  const anterior = !!emissao && movimentos.some(m => m.dia > emissao.dia);
+  if (emissao) {
+    mes = emissao.mes - (anterior ? 1 : 0) - mesesAtras; ano = emissao.ano;
+    while (mes < 1) { mes += 12; ano -= 1; }
+    deduzido = mesesAtras ? 'manual' : anterior ? 'mes-anterior' : 'mes-da-emissao';
+  }
+  for (const m of movimentos) {
+    if (emissao) {
+      m.mes = mes; m.ano = ano; m.ord = ordDoDia(ano, mes, m.dia);
+    } else {
+      m.mes = null; m.ano = null; m.ord = m.dia;
+    }
+    const ponto = { dia: m.dia, mes: m.mes, ano: m.ano, ord: m.ord };
+    if (!inicio || m.ord < inicio.ord) inicio = ponto;
+    if (!fim || m.ord > fim.ord) fim = ponto;
+  }
+
+  return {
+    emissao, mes, ano, deduzido, inicio, fim,
+    primeiroDia: inicio ? inicio.dia : null,
+    ultimoDia: fim ? fim.dia : null,
+    produtos
+  };
+}
+
+/* "06/11" quando o mês é conhecido, "06" quando não é */
+function diaMes(m) {
+  const d = String(m.dia).padStart(2, '0');
+  return m.mes ? d + '/' + String(m.mes).padStart(2, '0') : d;
+}
+
+/* ------------------------------------------------------------
+   Conferência do relatório contra o de-para e o histórico
+   ------------------------------------------------------------ */
+const PRAZO_NORMAL = 3; // dias observados entre apontamento e transferência
+
+function idadeEmDias(relatorio, mov) {
+  let ref = relatorio.fim ? relatorio.fim.ord : mov.ord;
+  /* Com o mês conhecido, a idade conta até hoje: a transferência que não saiu
+     aparece atrasada mesmo que o relatório tenha alguns dias. */
+  if (relatorio.mes && relatorio.refOrd) ref = Math.max(ref, relatorio.refOrd);
+  return Math.max(0, ref - mov.ord);
+}
+
+function ordDeHoje() {
+  const d = new Date();
+  return ordDoDia(d.getFullYear(), d.getMonth() + 1, d.getDate());
+}
+
+/* Resumo do relatório: só o que a conferência usa (produto, documento, OP,
+   quantidade e data de cada apontamento e transferência). Sem custo, sem
+   venda e sem o texto do PDF. É o que vai para o celular e para o backup. */
+function resumoDe(r) {
+  const produtos = {};
+  for (const [codigo, p] of r.produtos) {
+    produtos[codigo] = { descricao: p.descricao, apontamentos: p.apontamentos, transferencias: p.transferencias };
+  }
+  return { versao: 1, emissao: r.emissao, mes: r.mes, ano: r.ano, deduzido: r.deduzido,
+           inicio: r.inicio, fim: r.fim, primeiroDia: r.primeiroDia, ultimoDia: r.ultimoDia, produtos };
+}
+
+function relatorioDe(s) {
+  if (!s || !s.produtos) return null;
+  const produtos = new Map(Object.entries(s.produtos).map(([codigo, p]) => [codigo,
+    { codigo, descricao: p.descricao, apontamentos: p.apontamentos || [], transferencias: p.transferencias || [] }]));
+  return { emissao: s.emissao, mes: s.mes, ano: s.ano, deduzido: s.deduzido, inicio: s.inicio, fim: s.fim,
+           primeiroDia: s.primeiroDia, ultimoDia: s.ultimoDia, produtos };
+}
+
+function conferirRelatorio(relatorio, depara, pendenciasAbertas = []) {
+  const pendencias = [];   // apontado e não transferido neste relatório
+  const negativos  = [];   // transferido sem apontamento -> estoque negativo
+  const anteriores = [];   // transferido, apontamento em período que o app não viu
+  const resolvidas = [];   // pendências antigas fechadas por este relatório
+  const itensKos   = [];
+
+  /* a mesma pendência pode estar aberta em mais de uma conferência */
+  const chavesPendentes = new Map();
+  for (const p of pendenciasAbertas) {
+    const k = p.produto + '|' + p.doc;
+    if (!chavesPendentes.has(k)) chavesPendentes.set(k, []);
+    chavesPendentes.get(k).push(p);
+  }
+
+  for (const [codigo, prod] of relatorio.produtos) {
+    const par = depara[codigo];
+    if (!par) continue;               // item GODKS puro: não transfere
+    itensKos.push(codigo);
+
+    const porDocAp = new Map(prod.apontamentos.map(a => [a.doc, a]));
+    const porDocTr = new Map(prod.transferencias.map(t => [t.doc, t]));
+
+    const docsAp = prod.apontamentos.map(a => parseInt(a.doc, 10));
+    const menorDocAp = docsAp.length ? Math.min(...docsAp) : null;
+
+    for (const ap of prod.apontamentos) {
+      const tr = porDocTr.get(ap.doc);
+      if (tr) {
+        if (Math.abs(tr.qtd - ap.qtd) > 0.0001) {
+          pendencias.push({
+            tipo: 'qtd-transferencia', produto: codigo, descricao: prod.descricao,
+            doc: ap.doc, dia: ap.dia, mes: ap.mes, qtd: ap.qtd, qtdTransferida: tr.qtd,
+            idade: idadeEmDias(relatorio, ap)
+          });
+        }
+        continue;
+      }
+      pendencias.push({
+        tipo: 'sem-transferencia', produto: codigo, descricao: prod.descricao,
+        codigoKos: par[0], doc: ap.doc, dia: ap.dia, mes: ap.mes, op: ap.op, qtd: ap.qtd,
+        idade: idadeEmDias(relatorio, ap)
+      });
+    }
+
+    for (const tr of prod.transferencias) {
+      /* A transferência fecha a pendência antiga mesmo quando o apontamento
+         também está neste relatório: é o caso do período sobreposto. Só
+         fecha a que estava sem transferência e com a quantidade batendo. */
+      const chave = codigo + '|' + tr.doc;
+      const antigas = chavesPendentes.get(chave);
+      if (antigas) {
+        const ficam = [];
+        for (const antiga of antigas) {
+          const fecha = (!antiga.tipo || antiga.tipo === 'sem-transferencia') &&
+                        Math.abs(tr.qtd - antiga.qtd) <= 0.0001;
+          if (fecha) resolvidas.push({ ...antiga, resolvidaEm: { dia: tr.dia, mes: tr.mes, ano: tr.ano }, como: 'relatorio' });
+          else ficam.push(antiga);
+        }
+        if (ficam.length) chavesPendentes.set(chave, ficam); else chavesPendentes.delete(chave);
+        continue;
+      }
+
+      if (porDocAp.has(tr.doc)) continue;
+
+      const docNum = parseInt(tr.doc, 10);
+      if (menorDocAp === null || docNum < menorDocAp) {
+        anteriores.push({
+          tipo: 'apontamento-anterior', produto: codigo, descricao: prod.descricao,
+          doc: tr.doc, dia: tr.dia, mes: tr.mes, qtd: tr.qtd
+        });
+      } else {
+        negativos.push({
+          tipo: 'negativo-godks', produto: codigo, descricao: prod.descricao,
+          doc: tr.doc, dia: tr.dia, mes: tr.mes, qtd: tr.qtd
+        });
+      }
+    }
+  }
+
+  const ordena = (a, b) => (b.idade || 0) - (a.idade || 0) || a.produto.localeCompare(b.produto);
+  pendencias.sort(ordena);
+
+  return {
+    pendencias, negativos, anteriores, resolvidas,
+    itensKos,
+    totalProdutos: relatorio.produtos.size,
+    totalApontamentos: [...relatorio.produtos.values()].reduce((s, p) => s + p.apontamentos.length, 0),
+    totalTransferencias: [...relatorio.produtos.values()].reduce((s, p) => s + p.transferencias.length, 0),
+    aindaAbertas: [...chavesPendentes.values()].flat()
+  };
+}
+
+/* ------------------------------------------------------------
+   Etiqueta: OP(6) + produto(7) + documento(5) + quantidade(resto)
+   ------------------------------------------------------------ */
+function lerEtiqueta(bruto) {
+  const cod = String(bruto).replace(/\D/g, '');
+  if (cod.length < 19) return { ok: false, motivo: 'curto', cod };
+  return {
+    ok: true, cod,
+    op: cod.slice(0, 6),
+    produto: cod.slice(6, 13),
+    doc: cod.slice(13, 18).padStart(6, '0'),
+    qtd: parseInt(cod.slice(18), 10)
+  };
+}
+
+/* Produtos GODKS apontados por caixa: peças por caixa. Para estes o app
+   nunca pergunta. Outro item GODKS que apareça em caixa é confirmado uma vez. */
+const PACOTES_FIXOS = {};   // preenchido com a tabela "caixas" do banco
+function definirCaixas(lista) {
+  for (const k of Object.keys(PACOTES_FIXOS)) delete PACOTES_FIXOS[k];
+  for (const [k, v] of Object.entries(lista || {})) if (Number(v) > 0) PACOTES_FIXOS[k] = Number(v);
+}
+
+/* Resultado de uma bipagem.
+   estado = { fatoresPacote: {produto: pecasPorPacote} } */
+function conferirEtiqueta(bruto, relatorio, depara, estado = {}) {
+  const et = lerEtiqueta(bruto);
+  if (!et.ok) {
+    return { nivel: 'erro', titulo: 'Código não reconhecido',
+             detalhe: `Esperava pelo menos 19 dígitos, recebi ${et.cod.length}.`, etiqueta: et };
+  }
+
+  const par = depara[et.produto];
+  const ehKos = !!par;
+  const prod = relatorio.produtos.get(et.produto);
+  const nome = prod ? prod.descricao : (par ? par[1] : null);
+
+  if (!prod) {
+    return { nivel: 'erro', titulo: 'Produto fora do relatório',
+             detalhe: nome
+               ? `${nome} não teve movimento no período carregado. Confira se o relatório cobre a data da etiqueta.`
+               : 'Produto não aparece no relatório nem no cadastro KOS.',
+             etiqueta: et, ehKos, nome };
+  }
+
+  const ap = prod.apontamentos.find(a => a.doc === et.doc);
+  if (!ap) {
+    const docs = prod.apontamentos.map(a => parseInt(a.doc, 10));
+    const docNum = parseInt(et.doc, 10);
+    const menor = docs.length ? Math.min(...docs) : null;
+    if (menor !== null && docNum < menor) {
+      return { nivel: 'atencao', titulo: 'Etiqueta de período anterior',
+               detalhe: `O documento ${et.doc} é anterior aos deste relatório (menor: ${String(menor).padStart(6,'0')}). Puxe um relatório que cubra a data da etiqueta.`,
+               etiqueta: et, ehKos, nome };
+    }
+    return { nivel: 'erro', titulo: 'A fábrica não escaneou esta etiqueta',
+             detalhe: `O documento ${et.doc} está dentro da faixa do período mas não tem apontamento. O material veio pra expedição sem entrar no sistema.`,
+             etiqueta: et, ehKos, nome };
+  }
+
+  const avisos = [];
+  let aprendeuPacote = null;
+  let pisoNivel = 'ok';   // divergências que não impedem o aceite, mas não podem passar como ok
+
+  if (ap.op !== et.op) {
+    avisos.push(`Ordem de produção diferente: etiqueta ${et.op}, sistema ${ap.op}. Pode ser etiqueta trocada.`);
+    pisoNivel = 'atencao';
+  }
+
+  if (Math.abs(ap.qtd - et.qtd) > 0.0001) {
+    if (ehKos) {
+      return { nivel: 'erro', titulo: 'Quantidade divergente',
+               detalhe: `Etiqueta ${et.qtd}, sistema ${ap.qtd}. Item KOS é sempre apontado por peça, então a quantidade tem que bater.`,
+               etiqueta: et, ehKos, nome, apontamento: ap };
+    }
+    const fator = ap.qtd / et.qtd;
+    const inteiro = Number.isFinite(fator) && Math.abs(fator - Math.round(fator)) < 0.0001 && Math.round(fator) > 1;
+    const guardado = PACOTES_FIXOS[et.produto] || (estado.fatoresPacote || {})[et.produto];
+    if (inteiro && guardado === Math.round(fator)) {
+      aprendeuPacote = guardado;
+      avisos.push(`Apontado por caixa: ${et.qtd} cx × ${aprendeuPacote} pç = ${ap.qtd}.`);
+    } else if (inteiro && !guardado) {
+      /* Múltiplo exato pode ser caixa, mas também pode ser material faltando
+         (metade, um terço). Não aceito sozinho: você confirma uma vez por produto. */
+      const n = Math.round(fator);
+      return { nivel: 'erro', titulo: 'Quantidade diferente: é caixa?',
+               detalhe: `Etiqueta ${et.qtd}, sistema ${ap.qtd}. Se este produto é apontado em caixas de ${n} pç, confirme na lista e eu passo a aceitar sozinho. Se não é caixa, a quantidade está divergente.`,
+               etiqueta: et, ehKos, nome, apontamento: ap, sugerePacote: n };
+    } else {
+      return { nivel: 'erro', titulo: 'Quantidade divergente',
+               detalhe: guardado
+                 ? `Etiqueta ${et.qtd}, sistema ${ap.qtd}. Esse produto é apontado em caixas de ${guardado} pç, e a conta não fecha.`
+                 : `Etiqueta ${et.qtd}, sistema ${ap.qtd}. A diferença não é múltipla, então não é embalagem.`,
+               etiqueta: et, ehKos, nome, apontamento: ap };
+    }
+  }
+
+  if (!ehKos) {
+    return { nivel: pisoNivel, titulo: 'Apontada', detalhe: 'Item GODKS, não precisa de transferência.',
+             etiqueta: et, ehKos, nome, apontamento: ap, avisos, aprendeuPacote };
+  }
+
+  const tr = prod.transferencias.find(t => t.doc === et.doc);
+  if (tr) {
+    if (Math.abs(tr.qtd - ap.qtd) > 0.0001) {
+      return { nivel: 'erro', titulo: 'Transferência com quantidade diferente',
+               detalhe: `Apontado ${ap.qtd}, transferido ${tr.qtd} pra KOS.`,
+               etiqueta: et, ehKos, nome, apontamento: ap, transferencia: tr, avisos, aprendeuPacote };
+    }
+    return { nivel: pisoNivel, titulo: 'Apontada e transferida',
+             detalhe: `Transferida pra KOS no dia ${diaMes(tr)}.`,
+             etiqueta: et, ehKos, nome, apontamento: ap, transferencia: tr, avisos, aprendeuPacote };
+  }
+
+  const idade = idadeEmDias(relatorio, ap);
+  if (idade <= PRAZO_NORMAL) {
+    return { nivel: 'atencao', titulo: 'Aguardando transferência',
+             detalhe: `Apontada no dia ${diaMes(ap)}, há ${idade} dia(s). O normal é sair em até ${PRAZO_NORMAL} dias.`,
+             etiqueta: et, ehKos, nome, apontamento: ap, avisos, aprendeuPacote, idade };
+  }
+  return { nivel: 'erro', titulo: 'Transferência atrasada',
+           detalhe: `Apontada no dia ${diaMes(ap)}, há ${idade} dias, e não foi transferida. O estoque da KOS não carregou.`,
+           etiqueta: et, ehKos, nome, apontamento: ap, avisos, aprendeuPacote, idade };
+}
+
+/* ------------------------------------------------------------
+   Cadastro de relacionamento GODKS x KOS
+   Linha: <codigo KOS> - <descricao> >>>>> <codigo GODKS> - <descricao>
+   ------------------------------------------------------------ */
+function lerCadastro(linhas) {
+  const pares = {};
+  for (const linha of linhas) {
+    const m = linha.match(/(\d{4,9})\s*-\s*(.*?)\s*>+\s*(\d{4,9})\s*-\s*(.*)$/);
+    if (!m) continue;
+    pares[m[3]] = [m[1], m[4].trim()];
+  }
+  return pares;
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = { lerRelatorio, conferirRelatorio, lerEtiqueta, conferirEtiqueta, lerCadastro, paraNumero, diaMes, PRAZO_NORMAL, PACOTES_FIXOS, definirCaixas,
+                     idadeEmDias, ordDeHoje, ordDoDia, resumoDe, relatorioDe };
+}
+</script>
 <script>
 /* ---------- conta e banco (Supabase, projeto conferencia-etiquetas) ----------
    A chave abaixo é a "publishable": foi feita para ficar à vista no código.
@@ -403,7 +811,31 @@ const CADASTRO_LOCAL = 'coletor-cadastro-v1';
 let cadastro = {};
 try { cadastro = (JSON.parse(localStorage.getItem(CADASTRO_LOCAL)) || {}).mapa || {}; } catch (e) { cadastro = {}; }
 const temCadastro = () => Object.keys(cadastro).length > 0;
-const nomeDe = l => cadastro[l.produto] || l.nome || null;
+
+/* Fase 3: o celular confere na hora. Baixa do banco o resumo do relatório que
+   o PC abriu por último, o cadastro KOS completo, as caixas e as caixas que
+   você confirmou no PC. Tudo fica guardado no aparelho para funcionar sem sinal. */
+const CONF_LOCAL = 'coletor-conferencia-v1';
+let cel = { conf: null, depara: {}, caixas: {}, fatores: {} };
+try { cel = Object.assign(cel, JSON.parse(localStorage.getItem(CONF_LOCAL)) || {}); } catch (e) {}
+const guardarCel = () => { try { localStorage.setItem(CONF_LOCAL, JSON.stringify(cel)); } catch (e) {} };
+let relCel = null;
+function montarRel(){
+  definirCaixas(cel.caixas);
+  relCel = cel.conf && cel.conf.resumo ? relatorioDe(cel.conf.resumo) : null;
+}
+montarRel();
+
+function aplicarVeredito(l){
+  if (!relCel || l.suspeita) { delete l.nivel; delete l.titulo; delete l.detalhe; delete l.aviso; return; }
+  relCel.refOrd = ordDeHoje();       // atraso contado até hoje, como no PC
+  const r = conferirEtiqueta(l.cod, relCel, cel.depara, { fatoresPacote: cel.fatores });
+  l.nivel = r.nivel; l.titulo = r.titulo; l.detalhe = r.detalhe || ''; l.aviso = (r.avisos || []).join(' ');
+}
+function reavaliarTodas(){ lidas.forEach(aplicarVeredito); guardar(); pintar(); }
+const pedeMotivo = l => l.nivel === 'erro' || (l.nivel === 'atencao' && l.titulo !== 'Aguardando transferência');
+const motivoDe = l => [l.nivel === 'erro' ? l.detalhe : '', l.aviso].filter(Boolean).join(' ') || l.detalhe || '';
+const nomeDe = l => cadastro[l.produto] || (relCel && relCel.produtos.has(l.produto) ? relCel.produtos.get(l.produto).descricao : null) || l.nome || null;
 const ehKos  = l => temCadastro() ? !!cadastro[l.produto] : !!l.kos;
 let ultimoCod = null, ultimoEm = 0;
 let detector = null, trilha = null, rodando = false, pausado = false;
@@ -475,13 +907,58 @@ function registrar(bruto, fonte){
   /* toda etiqueta sua tem 22 dígitos; fora disso pode ser leitura parcial */
   et.suspeita = cod.length !== DIGITOS;
   et.quando = new Date().toISOString();
+  aplicarVeredito(et);
   lidas.push(et);
   travadoAte = Date.now() + 250;   // evita disparar em rajada ao mover o celular
   candidato = null; confirmacoes = 0;
   guardar(); pintar();
   if (et.suspeita) { piscar(true); vibrar([70,60,70]); recado(`Leitura de ${cod.length} dígitos, confira essa`); }
+  else if (et.nivel) avisarVeredito(et);
   else { piscar(false); vibrar(55); }
 }
+
+function avisarVeredito(l){
+  const n = l.nivel;
+  const f = $('flash');
+  f.className = 'flash' + (n === 'ok' ? '' : ' ' + n);
+  void f.offsetWidth; f.classList.add('pisca');
+  setTimeout(() => f.classList.remove('pisca'), 260);
+  vibrar(n === 'erro' ? [400] : n === 'atencao' ? [60,90,60] : 55);
+  som(n);
+  if (n !== 'ok') recado(l.titulo);
+}
+
+/* Bipes iguais aos do PC: um curto (certo), dois (atenção), um grave (erro). */
+let somLigado = localStorage.getItem('coletor-som') !== 'nao';
+let audio = null;
+function som(nivel){
+  if (!somLigado) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const notas = { ok: [[880, .09]], atencao: [[660, .09], [660, .09]], erro: [[180, .38]] };
+    let t = audio.currentTime;
+    for (const [hz, dur] of (notas[nivel] || notas.ok)) {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = hz; o.type = 'square';
+      g.gain.setValueAtTime(.001, t);
+      g.gain.exponentialRampToValueAtTime(.16, t + .012);
+      g.gain.exponentialRampToValueAtTime(.001, t + dur);
+      o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t + dur + .02);
+      t += dur + .05;
+    }
+  } catch (e) { /* sem áudio */ }
+}
+/* o navegador só libera o som depois do primeiro toque na tela */
+document.addEventListener('pointerdown', () => {
+  try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch (e) {}
+}, { once: true });
+function pintarSom(){ $('bt-som').textContent = somLigado ? 'Som' : 'Mudo'; }
+$('bt-som').onclick = () => {
+  somLigado = !somLigado;
+  try { localStorage.setItem('coletor-som', somLigado ? 'sim' : 'nao'); } catch (e) {}
+  pintarSom(); if (somLigado) som('ok');
+};
+pintarSom();
 
 /* ---------- tela ---------- */
 function pintar(){
@@ -490,21 +967,25 @@ function pintar(){
   ['bt-enviar','bt-copiar','bt-baixar','bt-ver','bt-limpar'].forEach(b => $(b).disabled = !lidas.length);
 
   const u = lidas[lidas.length - 1];
+  $('ultima').className = 'ultima' + (u && u.nivel && u.nivel !== 'ok' ? ' ' + u.nivel : '');
   $('ultima').innerHTML = u ? `
       <div class="nome">${esc(nomeDe(u) || 'Produto ' + u.produto)}
         <span class="tag ${ehKos(u) ? 'kos' : 'godks'}">${ehKos(u) ? 'KOS' : 'GODKS'}</span></div>
       <div class="meta"><span>${esc(u.produto)}</span><span>doc ${esc(u.doc)}</span>
-        <span>${u.qtd} un</span></div>`
+        <span>${u.qtd} un</span></div>
+      ${u.nivel ? `<div class="veredito ${u.nivel}">${esc(u.titulo)}</div>
+        ${u.nivel !== 'ok' ? `<div class="motivo">${esc(motivoDe(u))}</div>` : ''}` : ''}`
     : '<div class="nada">Aponte a câmera na primeira etiqueta.</div>';
 
   $('lista').innerHTML = lidas.slice().reverse().map((l, i) => {
       const pos = lidas.length - i;
-      return `<li><span class="pos">${pos}</span>
+      return `<li><span class="bola ${l.nivel || ''}"></span><span class="pos">${pos}</span>
           <span class="doc">${esc(l.doc)}</span>
           <span class="nm">${esc(nomeDe(l) || l.produto)}</span>
           <span class="tag ${l.suspeita ? 'suspeita' : ehKos(l) ? 'kos' : 'godks'}">${
             l.suspeita ? 'CONFERIR' : ehKos(l) ? 'KOS' : 'GODKS'}</span>
-          <button class="excluir" data-pos="${pos - 1}" aria-label="Excluir a ${pos}ª">&times;</button></li>`;
+          <button class="excluir" data-pos="${pos - 1}" aria-label="Excluir a ${pos}ª">&times;</button>${
+          pedeMotivo(l) ? `<span class="mot ${l.nivel}">${esc(l.titulo)}: ${esc(motivoDe(l))}</span>` : ''}</li>`;
     }).join('');
 }
 
@@ -791,17 +1272,54 @@ function pintarConta(){
   };
   if (c) c.onclick = () => abrirConta();
 }
-Conta.aoSair(() => pintarConta());
+Conta.aoSair(() => { pintarConta(); pintarContra(); });
 
-async function baixarCadastro(){
+async function baixarCadastro(avisar){
   try {
-    const linhas = await Conta.todos('cadastro?select=codigo_godks,descricao&order=codigo_godks');
+    const [linhas, cx, aj, confs] = await Promise.all([
+      Conta.todos('cadastro?select=codigo_godks,codigo_kos,descricao&order=codigo_godks'),
+      Conta.api('caixas?select=codigo,pecas'),
+      Conta.api('ajustes?chave=eq.fatoresPacote&select=valor'),
+      Conta.api('conferencias?select=id,periodo,resumo,aberta_em&order=aberta_em.desc&limit=5')
+    ]);
     if (!linhas.length) { recado('Seu usuário não está liberado no banco'); return; }
     cadastro = Object.fromEntries(linhas.map(l => [l.codigo_godks, l.descricao]));
     try { localStorage.setItem(CADASTRO_LOCAL, JSON.stringify({ quando: Date.now(), mapa: cadastro })); } catch (e) {}
-    pintar();
-  } catch (e) { /* sem internet: fica com o cadastro guardado */ }
+    const c = (confs || []).find(x => x.resumo && x.resumo.produtos) || null;
+    cel = {
+      conf: c, quando: Date.now(),
+      depara: Object.fromEntries(linhas.map(l => [l.codigo_godks, [l.codigo_kos, l.descricao]])),
+      caixas: Object.fromEntries((cx || []).map(x => [x.codigo, x.pecas])),
+      fatores: (aj && aj[0] && aj[0].valor) || {}
+    };
+    guardarCel(); montarRel(); reavaliarTodas(); pintarContra();
+    if (avisar) recado(c ? 'Relatório atualizado' : 'Nenhum relatório aberto no PC ainda');
+  } catch (e) {
+    if (avisar) recado(e.semSessao ? 'Entre para atualizar' : 'Sem internet: usando o último relatório');
+  }
 }
+
+function pintarContra(){
+  const caixa = $('contra');
+  caixa.classList.toggle('oculto', !Conta.logado && !cel.conf);
+  const c = cel.conf;
+  if (c) {
+    const d = new Date(c.aberta_em);
+    const p = n => String(n).padStart(2, '0');
+    const i = c.resumo.inicio, f = c.resumo.fim;
+    const per = i && f && i.mes ? `${p(i.dia)}/${p(i.mes)} a ${p(f.dia)}/${p(f.mes)}` : esc(c.periodo);
+    $('contra-texto').innerHTML = `Relatório <b>${per}</b> · aberto no PC ${p(d.getDate())}/${p(d.getMonth()+1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  } else {
+    $('contra-texto').textContent = 'Sem relatório: solte o PDF no PC e toque em Atualizar.';
+  }
+}
+let ultimaBusca = 0;
+$('bt-atualizar').onclick = () => { if (!Conta.logado) { abrirConta('Entre para baixar o relatório do PC.', () => baixarCadastro(true)); return; } baixarCadastro(true); };
+/* ao voltar para o app, busca o relatório de novo (no máximo a cada 30 s) */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !Conta.logado || Date.now() - ultimaBusca < 30000) return;
+  ultimaBusca = Date.now(); baixarCadastro(false);
+});
 
 /* ---------- saída ---------- */
 function texto(){ return lidas.map(l => l.cod).join('\n'); }
@@ -851,8 +1369,10 @@ $('bt-limpar').onclick = () => {
 };
 
 const retorno = Conta.lerRetorno();
+if (relCel) lidas.forEach(aplicarVeredito);
 pintar();
 pintarConta();
+pintarContra();
 if (retorno && retorno.erro) abrirConta(retorno.erro);
 else if (retorno && retorno.tipo === 'recovery') {
   $('form-entrar').classList.add('oculto'); $('form-nova').classList.remove('oculto');

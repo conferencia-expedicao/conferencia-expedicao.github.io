@@ -202,6 +202,8 @@ dialog input[type=text]{width:100%;padding:9px 11px;border:1px solid var(--traco
        border-radius:3px;font:inherit;margin-top:12px}
 dialog input:focus{outline:2px solid var(--etiqueta);outline-offset:1px}
 
+.nuvem-status{font-size:12.5px;color:#8FB5CC;margin-right:4px}
+.nuvem-status.falha{color:#F2B8B5}
 .quem{display:flex;align-items:center;gap:8px;font-size:13px;color:#A9C4D4;margin-right:6px}
 dialog input[type=email],dialog input[type=password]{width:100%;padding:9px 11px;border:1px solid var(--traco);
        border-radius:3px;font:inherit;margin-top:10px}
@@ -222,8 +224,9 @@ dialog .conta-erro{padding:8px 20px 0;min-height:18px;color:var(--erro);font-siz
 
 <header class="topo">
   <h1>Conferência de etiquetas</h1>
-  <span class="rota">GODKS &rarr; KOS · v3.1</span>
+  <span class="rota">GODKS &rarr; KOS · v4</span>
   <div class="dir">
+    <span class="nuvem-status" id="nuvem-status"></span>
     <span class="quem" id="quem"></span>
     <label class="mudo"><input type="checkbox" id="som" checked> som</label>
     <button class="btn btn-claro btn-min" id="bt-cadastro">Atualizar cadastro</button>
@@ -551,8 +554,36 @@ function diaMes(m) {
 const PRAZO_NORMAL = 3; // dias observados entre apontamento e transferência
 
 function idadeEmDias(relatorio, mov) {
-  const ref = relatorio.fim ? relatorio.fim.ord : mov.ord;
+  let ref = relatorio.fim ? relatorio.fim.ord : mov.ord;
+  /* Com o mês conhecido, a idade conta até hoje: a transferência que não saiu
+     aparece atrasada mesmo que o relatório tenha alguns dias. */
+  if (relatorio.mes && relatorio.refOrd) ref = Math.max(ref, relatorio.refOrd);
   return Math.max(0, ref - mov.ord);
+}
+
+function ordDeHoje() {
+  const d = new Date();
+  return ordDoDia(d.getFullYear(), d.getMonth() + 1, d.getDate());
+}
+
+/* Resumo do relatório: só o que a conferência usa (produto, documento, OP,
+   quantidade e data de cada apontamento e transferência). Sem custo, sem
+   venda e sem o texto do PDF. É o que vai para o celular e para o backup. */
+function resumoDe(r) {
+  const produtos = {};
+  for (const [codigo, p] of r.produtos) {
+    produtos[codigo] = { descricao: p.descricao, apontamentos: p.apontamentos, transferencias: p.transferencias };
+  }
+  return { versao: 1, emissao: r.emissao, mes: r.mes, ano: r.ano, deduzido: r.deduzido,
+           inicio: r.inicio, fim: r.fim, primeiroDia: r.primeiroDia, ultimoDia: r.ultimoDia, produtos };
+}
+
+function relatorioDe(s) {
+  if (!s || !s.produtos) return null;
+  const produtos = new Map(Object.entries(s.produtos).map(([codigo, p]) => [codigo,
+    { codigo, descricao: p.descricao, apontamentos: p.apontamentos || [], transferencias: p.transferencias || [] }]));
+  return { emissao: s.emissao, mes: s.mes, ano: s.ano, deduzido: s.deduzido, inicio: s.inicio, fim: s.fim,
+           primeiroDia: s.primeiroDia, ultimoDia: s.ultimoDia, produtos };
 }
 
 function conferirRelatorio(relatorio, depara, pendenciasAbertas = []) {
@@ -788,7 +819,8 @@ function lerCadastro(linhas) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { lerRelatorio, conferirRelatorio, lerEtiqueta, conferirEtiqueta, lerCadastro, paraNumero, diaMes, PRAZO_NORMAL, PACOTES_FIXOS, definirCaixas };
+  module.exports = { lerRelatorio, conferirRelatorio, lerEtiqueta, conferirEtiqueta, lerCadastro, paraNumero, diaMes, PRAZO_NORMAL, PACOTES_FIXOS, definirCaixas,
+                     idadeEmDias, ordDeHoje, ordDoDia, resumoDe, relatorioDe };
 }
 </script>
 <script>
@@ -980,7 +1012,7 @@ function carregar() {
 }
 
 function salvar() {
-  try { localStorage.setItem(CHAVE, JSON.stringify(estado)); return true; }
+  try { localStorage.setItem(CHAVE, JSON.stringify(estado)); agendarSync(); return true; }
   catch (err) {
     aviso('Não consegui salvar', 'O navegador recusou a gravação: ' + err.message +
           ' Exporte um backup antes de fechar a página.');
@@ -999,6 +1031,120 @@ definirCaixas(dados.caixas);
 const temCadastro = () => Object.keys(depara).length > 0;
 let rel = null;        // relatório em memória
 let conf = null;       // conferência atual
+const comHoje = r => (r ? Object.assign(r, { refOrd: ordDeHoje() }) : r);
+
+/* ---------------- backup automático no banco ----------------
+   Toda vez que o app salva, as conferências que mudaram vão para a tabela
+   "conferencias" (sem o texto do PDF) e as caixas aprendidas para "ajustes".
+   Se a internet cair, fica guardado aqui e tenta de novo depois. */
+const SYNC_LOCAL = 'conferencia-sync-v1';
+let sync = { confs: {}, fatores: null };      // o que já está no banco: id -> { h, em }
+try { sync = Object.assign(sync, JSON.parse(localStorage.getItem(SYNC_LOCAL)) || {}); } catch (e) {}
+const guardarSync = () => { try { localStorage.setItem(SYNC_LOCAL, JSON.stringify(sync)); } catch (e) {} };
+function resumoHash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return h.toString(36) + '.' + s.length; }
+function dadosDe(c) { const copia = Object.assign({}, c); delete copia.linhas; delete copia.resumo; return copia; }
+const hashConf = c => resumoHash(JSON.stringify([dadosDe(c), c.resumo || null]));
+let nuvem = { ok: null };
+let syncTimer = null, sincronizando = false, deNovo = false;
+function agendarSync(ms = 1200) { clearTimeout(syncTimer); syncTimer = setTimeout(enviarMudancas, ms); }
+
+async function enviarMudancas() {
+  if (!Conta.logado) { pintarNuvem(); return; }
+  if (sincronizando) { deNovo = true; return; }
+  sincronizando = true; deNovo = false;
+  try {
+    const agora = new Date().toISOString();
+    const mudadas = [];
+    for (const c of estado.conferencias) {
+      const hc = hashConf(c);
+      if (sync.confs[c.id] && sync.confs[c.id].h === hc) continue;
+      mudadas.push({ id: c.id, h: hc, linha: { id: c.id, periodo: periodoTexto(c).slice(0, 120),
+        resumo: c.resumo || {}, dados: dadosDe(c), aberta_em: c.abertaEm || c.criadaEm, atualizado_em: agora } });
+    }
+    for (let i = 0; i < mudadas.length; i += 20) {
+      const parte = mudadas.slice(i, i + 20);
+      await Conta.api('conferencias', { method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(parte.map(m => m.linha)) });
+      for (const m of parte) sync.confs[m.id] = { h: m.h, em: agora };
+      guardarSync();
+    }
+    const ids = new Set(estado.conferencias.map(c => c.id));
+    const sumidas = Object.keys(sync.confs).filter(id => !ids.has(id));
+    for (let i = 0; i < sumidas.length; i += 50) {
+      const parte = sumidas.slice(i, i + 50);
+      await Conta.api('conferencias?id=in.(' + parte.map(encodeURIComponent).join(',') + ')', { method: 'DELETE' });
+      parte.forEach(id => delete sync.confs[id]); guardarSync();
+    }
+    const f = JSON.stringify(estado.fatoresPacote || {});
+    if (f !== sync.fatores) {
+      await Conta.api('ajustes', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ chave: 'fatoresPacote', valor: estado.fatoresPacote || {}, atualizado_em: agora }) });
+      sync.fatores = f; guardarSync();
+    }
+    nuvem = { ok: true, em: Date.now() };
+  } catch (err) {
+    nuvem = { ok: false, erro: err.message };
+    clearTimeout(syncTimer); syncTimer = setTimeout(enviarMudancas, 60000);   // tenta de novo em 1 minuto
+  } finally {
+    sincronizando = false; pintarNuvem();
+    if (deNovo) agendarSync(300);
+  }
+}
+
+/* Traz do banco as conferências feitas em outro PC (ou depois de limpar o navegador). */
+async function puxarDoBanco() {
+  const remotas = await Conta.todos('conferencias?select=id,resumo,dados,atualizado_em');
+  const fat = await Conta.api('ajustes?chave=eq.fatoresPacote&select=valor');
+  let mudou = false;
+  const noBanco = new Set();
+  for (const r of remotas) {
+    noBanco.add(r.id);
+    const conhecida = sync.confs[r.id];
+    const maisNova = !conhecida || Date.parse(r.atualizado_em) > Date.parse(conhecida.em) + 1000;
+    const resumo = r.resumo && r.resumo.produtos ? r.resumo : undefined;
+    let local = estado.conferencias.find(c => c.id === r.id);
+    if (!local) {
+      if (conhecida && !maisNova) continue;            // apagada aqui; o envio apaga lá
+      local = Object.assign({}, r.dados, { resumo });
+      estado.conferencias.push(local); mudou = true;
+    } else if (conhecida && maisNova) {                // mexida em outro PC depois do último envio daqui
+      const linhas = local.linhas;
+      for (const k of Object.keys(local)) delete local[k];
+      Object.assign(local, r.dados, { resumo }); if (linhas) local.linhas = linhas;
+      if (conf && conf.id === local.id) { conf = null; rel = null; }
+      mudou = true;
+    } else if (!conhecida) {                           // existe nos dois e nunca foi comparada: vale a daqui
+      sync.confs[r.id] = { h: '', em: r.atualizado_em };
+      continue;
+    }
+    sync.confs[r.id] = { h: hashConf(local), em: r.atualizado_em };
+  }
+  for (const id of Object.keys(sync.confs)) {          // apagadas em outro PC
+    if (noBanco.has(id)) continue;
+    estado.conferencias = estado.conferencias.filter(c => c.id !== id);
+    if (conf && conf.id === id) { conf = null; rel = null; }
+    delete sync.confs[id]; mudou = true;
+  }
+  if (fat && fat[0] && fat[0].valor) {
+    const junto = Object.assign({}, fat[0].valor, estado.fatoresPacote || {});
+    if (JSON.stringify(junto) !== JSON.stringify(estado.fatoresPacote || {})) { estado.fatoresPacote = junto; mudou = true; }
+    sync.fatores = JSON.stringify(fat[0].valor);
+  }
+  guardarSync();
+  if (mudou) {
+    estado.conferencias.sort((a, b) => (a.criadaEm > b.criadaEm ? -1 : 1));
+    salvar(); render();
+  } else agendarSync(0);
+  return mudou;
+}
+
+function pintarNuvem() {
+  const s = $('nuvem-status'); if (!s) return;
+  s.classList.toggle('falha', nuvem.ok === false && Conta.logado);
+  s.textContent = !Conta.logado ? '' : nuvem.ok === false ? 'sem internet: guardado só neste PC'
+    : nuvem.ok ? 'salvo na nuvem' : '';
+  s.title = nuvem.ok === false ? nuvem.erro : '';
+}
 
 /* ---------------- utilidades ---------------- */
 const num = n => Number(n).toLocaleString('pt-BR');
@@ -1168,7 +1314,7 @@ async function carregarRelatorio(file) {
   try { linhas = await linhasDoPDF(file); }
   catch (err) { aviso('Não consegui ler esse PDF', err.message + ' Confira se é o relatório de movimentação.'); return; }
 
-  const r = lerRelatorio(linhas);
+  const r = comHoje(lerRelatorio(linhas));
   if (!r.produtos.size) {
     aviso('Esse PDF não parece o relatório de movimentação',
           'Não encontrei nenhuma linha de produto. Se o arquivo certo é o cadastro de códigos, use "Atualizar cadastro".');
@@ -1248,6 +1394,7 @@ async function carregarRelatorio(file) {
   if (!alvo) estado.conferencias.unshift(conf);
 
   rel = r;
+  conf.resumo = resumoDe(r); conf.abertaEm = new Date().toISOString();
   if (alvo) { reavaliarBipadas(); recalcularSituacao(conf); }
   podarLinhas(); salvar(); render();
 
@@ -1257,13 +1404,26 @@ async function carregarRelatorio(file) {
   }
 }
 
+/* Idade das paradas recontada até hoje ao reabrir. */
+function atualizarIdades(c, r) {
+  for (const p of (c.pendencias || [])) {
+    const prod = r.produtos.get(p.produto);
+    const ap = prod && prod.apontamentos.find(a => a.doc === p.doc);
+    if (ap) p.idade = idadeEmDias(r, ap);
+  }
+}
+
 /* reabre uma conferência guardada */
 function reabrir(id) {
   const c = estado.conferencias.find(x => x.id === id);
   if (!c) return;
   if (!exigirCadastro()) return;
-  if (!c.linhas) { aviso('Relatório não guardado', 'Essa conferência é antiga e o relatório dela foi descartado para poupar espaço. Carregue o PDF do período de novo para voltar a bipar.'); return; }
-  conf = c; rel = lerRelatorio(c.linhas, { mesesAtras: mesesAtrasDe(c) }); reavaliarBipadas(); recalcularSituacao(conf); salvar(); render();
+  if (!c.linhas && !c.resumo) { aviso('Relatório não guardado', 'Essa conferência é antiga e o relatório dela foi descartado para poupar espaço. Carregue o PDF do período de novo para voltar a bipar.'); return; }
+  conf = c;
+  rel = comHoje(c.linhas ? lerRelatorio(c.linhas, { mesesAtras: mesesAtrasDe(c) }) : relatorioDe(c.resumo));
+  c.resumo = resumoDe(rel); c.abertaEm = new Date().toISOString();
+  atualizarIdades(c, rel);
+  reavaliarBipadas(); recalcularSituacao(conf); salvar(); render();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1479,6 +1639,7 @@ async function ignorarNegativo(idx) {
 
 /* ---------------- trocar o mês ---------------- */
 async function trocarMes() {
+  if (!conf.linhas) { aviso('Carregue o PDF de novo', 'Esta conferência veio do backup, sem o texto do relatório. Para trocar o mês, solte o PDF do período outra vez.'); return; }
   const atras = mesesAtrasDe(conf);
   const outro = lerRelatorio(conf.linhas || [], { mesesAtras: atras ? 0 : 1 });
   const vai = await perguntar('Mês do movimento',
@@ -1487,7 +1648,8 @@ async function trocarMes() {
     [{ rotulo: 'Deixar como está', valor: false }, { rotulo: 'Trocar', valor: true }]);
   if (!vai) return;
   conf.mesesAtras = atras ? 0 : 1;
-  rel = lerRelatorio(conf.linhas, { mesesAtras: conf.mesesAtras });
+  rel = comHoje(lerRelatorio(conf.linhas, { mesesAtras: conf.mesesAtras }));
+  conf.resumo = resumoDe(rel);
   Object.assign(conf, { mes: rel.mes, ano: rel.ano, deduzido: rel.deduzido,
     primeiroDia: rel.primeiroDia, ultimoDia: rel.ultimoDia, inicio: rel.inicio, fim: rel.fim });
   await reconferir(); reavaliarBipadas(); recalcularSituacao(conf); salvar(); render();
@@ -1619,6 +1781,9 @@ async function sincronizar() {
   } catch (err) {
     if (!temCadastro()) aviso('Não consegui baixar o cadastro', err.message);
   }
+  try { await puxarDoBanco(); nuvem = { ok: true, em: Date.now() }; }
+  catch (err) { nuvem = { ok: false, erro: err.message }; }
+  pintarNuvem();
 }
 
 function abrirEntrar(texto) {
@@ -2076,7 +2241,7 @@ $('form-nova').onsubmit = async ev => {
   } catch (err) { $('nova-erro').textContent = err.message; }
   finally { $('bt-nova').disabled = false; }
 };
-Conta.aoSair(() => { pintarConta(); if (!$('nuvem').classList.contains('oculto')) listarRemotos(); });
+Conta.aoSair(() => { pintarConta(); pintarNuvem(); if (!$('nuvem').classList.contains('oculto')) listarRemotos(); });
 
 render();
 pintarConta();
