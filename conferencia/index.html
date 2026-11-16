@@ -1493,6 +1493,7 @@ async function carregarRelatorio(file) {
   };
   Object.assign(conf, {
     mes: r.mes, ano: r.ano, deduzido: r.deduzido, emissao: r.emissao,
+    horaEmissao: (linhas.slice(0, 8).map(l => l.match(/HORA[-\s]+(\d{2}:\d{2})/)).find(Boolean) || [])[1] || null,
     primeiroDia: r.primeiroDia, ultimoDia: r.ultimoDia,
     inicio: r.inicio, fim: r.fim, mesesAtras: 0,
     linhas,
@@ -2137,7 +2138,8 @@ function renderResumo() {
       <div class="num"><b>${num((conf.bipadas||[]).filter(b=>b.produto).length)}</b> de
         <b>${num(t.apontamentos||0)}</b> apontamentos bipados,
         <b>${num(t.transferencias||0)}</b> transferências,
-        <b>${num(t.itensKos||0)}</b> itens KOS entre <b>${num(t.produtos||0)}</b> produtos</div>
+        <b>${num(t.itensKos||0)}</b> itens KOS entre <b>${num(t.produtos||0)}</b> produtos${
+        conf.emissao ? ` · emitido no ERP em <b>${dd(conf.emissao.dia)}/${dd(conf.emissao.mes)}${conf.horaEmissao ? ' às ' + esc(conf.horaEmissao) : ''}</b>` : ''}</div>
     </div>
     <div class="acoes">
       <button class="btn btn-min" id="bt-imprimir">Imprimir conferência</button>
