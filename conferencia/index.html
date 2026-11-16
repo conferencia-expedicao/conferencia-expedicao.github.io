@@ -279,7 +279,7 @@ dialog .conta-erro{padding:8px 22px 0;min-height:18px;color:var(--erro);font-siz
     <span class="logo" aria-hidden="true"></span>
     <div>
       <h1>Conferência de etiquetas</h1>
-      <span class="rota">GODKS &rarr; KOS · v5.1</span>
+      <span class="rota">GODKS &rarr; KOS · v5.2</span>
     </div>
   </div>
   <div class="dir">
@@ -1382,8 +1382,12 @@ function baixarResolvidas(lista) {
    depois de a transferência aparecer num relatório mais novo. */
 function reavaliarBipadas(filtro) {
   for (const b of (conf.bipadas || [])) {
-    if (!b.produto || b.resolvida || (filtro && !filtro(b))) continue;
+    if (!b.produto || (filtro && !filtro(b))) continue;
     const r = conferirEtiqueta(b.cod, rel, depara, estado);
+    if (b.resolvida) {
+      if (r.nivel !== 'ok') continue;      // continua valendo a sua baixa
+      b.resolvida = false;                 // o relatório novo resolveu sozinho
+    }
     b.nivel = r.nivel; b.titulo = r.titulo; b.detalhe = r.detalhe;
     b.sugerePacote = r.sugerePacote || null; b.aviso = (r.avisos || []).join(' ');
   }
@@ -2466,7 +2470,7 @@ window.addEventListener('focus', () => verificarLotes());
 function semEtiqueta() {
   if (!rel) return [];
   const bipados = new Set((conf.bipadas || [])
-    .filter(b => b.produto && b.doc && (!b.resolvida || b.nivel !== 'erro'))
+    .filter(b => b.produto && b.doc && (!b.resolvida || b.nivel !== 'erro' || /^Transferência/.test(b.titulo || '')))
     .map(b => b.produto + '|' + b.doc));
   const justificados = new Set(conf.justificados || []);
   const fora = [];
