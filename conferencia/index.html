@@ -279,7 +279,7 @@ dialog .conta-erro{padding:8px 22px 0;min-height:18px;color:var(--erro);font-siz
     <span class="logo" aria-hidden="true"></span>
     <div>
       <h1>Conferência de etiquetas</h1>
-      <span class="rota">GODKS &rarr; KOS · v5</span>
+      <span class="rota">GODKS &rarr; KOS · v5.1</span>
     </div>
   </div>
   <div class="dir">
@@ -1421,6 +1421,16 @@ async function carregarRelatorio(file) {
     return;
   }
 
+  const deEtiqueta = [...r.produtos].filter(([cod, p]) => /^\d{7}$/.test(cod) && p.apontamentos.length);
+  if (!deEtiqueta.length) {
+    const exemplos = [...r.produtos.values()].filter(p => p.apontamentos.length).slice(0, 2).map(p => p.descricao).join(', ');
+    aviso('Esse relatório não é o dos produtos acabados',
+      `Os produtos deste PDF${exemplos ? ` (${exemplos}...)` : ''} são matéria-prima e embalagem, com código de 6 ou 8 dígitos. ` +
+      'A conferência usa a movimentação dos produtos acabados, com código de 7 dígitos (5000000 em diante), que é o que vem na etiqueta. ' +
+      'No ERP, confira a faixa de produtos do relatório e puxe de novo. Nada foi alterado na sua conferência.');
+    return;
+  }
+
   const igual = estado.conferencias.find(c =>
     c.mes === r.mes && c.ano === r.ano && c.primeiroDia === r.primeiroDia && c.ultimoDia === r.ultimoDia);
 
@@ -1449,6 +1459,17 @@ async function carregarRelatorio(file) {
   }
 
   const alvo = continuar ? (igual || anterior) : null;
+  if (alvo) {
+    const antes = (alvo.bipadas || []).filter(b => b.produto && b.titulo !== 'Produto fora do relatório');
+    const somem = antes.filter(b => !r.produtos.has(b.produto)).length;
+    if (antes.length >= 3 && somem > antes.length / 2) {
+      const vai = await perguntar('Este relatório não bate com o que você já bipou',
+        `Das ${num(antes.length)} etiquetas conferidas nesta conferência, ${num(somem)} são de produtos que não aparecem neste PDF. ` +
+        'Parece outro relatório: outra faixa de produtos, outra empresa ou outro período. Se carregar, essas etiquetas viram erro.',
+        [{ rotulo: 'Carregar mesmo assim', valor: true }, { rotulo: 'Cancelar', valor: false }]);
+      if (!vai) return;
+    }
+  }
   const c = conferirRelatorio(r, depara, abertasDeOutras(alvo ? alvo.id : null));
 
   baixarResolvidas(c.resolvidas);
