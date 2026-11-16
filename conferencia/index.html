@@ -89,6 +89,8 @@ h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
 .faixa-aviso,.faixa-lote{border-radius:var(--raio);padding:11px 16px;margin-bottom:14px;font-size:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .faixa-aviso{background:var(--espera-bg);border:1px solid #EBCB8B;color:#5C3A00;display:block}
 .faixa-lote{background:var(--azul-bg);border:1px solid #B5DDF2}
+.faixa-mes{background:#EEF1FF;border:1px solid #C9D2F5;color:#27306B;border-radius:var(--raio);padding:11px 16px;margin-bottom:14px;font-size:14px}
+.carga .faixa-mes{margin-bottom:16px}
 .faixa-lote .txt{flex:1;min-width:200px}
 .faixa-lote .ponto{width:9px;height:9px;border-radius:50%;background:var(--etiqueta);flex:none;box-shadow:0 0 0 4px #1B9FD833}
 
@@ -104,7 +106,8 @@ h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
 .cartao .val small{font-size:15px;font-weight:500;color:var(--tinta2);letter-spacing:0}
 .cartao .sub{font-size:13px;color:var(--tinta2);min-height:20px;display:flex;align-items:center}
 .cartao.erro .val{color:var(--erro)} .cartao.espera .val{color:var(--espera)} .cartao.ok .val{color:var(--ok)}
-.cartao.erro .sub{color:var(--erro)}
+.cartao.erro .sub,.cartao.aviso .sub{color:var(--erro)}
+.cartao.aviso .sub{font-weight:600}
 .barra{display:block;width:100%;height:6px;border-radius:99px;background:var(--traco2);overflow:hidden}
 .barra i{display:block;height:100%;border-radius:99px;background:var(--etiqueta)}
 
@@ -279,7 +282,7 @@ dialog .conta-erro{padding:8px 22px 0;min-height:18px;color:var(--erro);font-siz
     <span class="logo" aria-hidden="true"></span>
     <div>
       <h1>Conferência de etiquetas</h1>
-      <span class="rota">GODKS &rarr; KOS · v5.2</span>
+      <span class="rota">GODKS &rarr; KOS · v5.3</span>
     </div>
   </div>
   <div class="dir">
@@ -299,6 +302,7 @@ dialog .conta-erro{padding:8px 22px 0;min-height:18px;color:var(--erro);font-siz
 
 <!-- tela de carga -->
 <section class="carga" id="tela-carga">
+  <div class="faixa-mes lembrete-mes oculto"></div>
   <div class="sem-cadastro oculto" id="sem-cadastro">
     <p>Entre com o e-mail de trabalho, com o PC na internet, para eu baixar o cadastro KOS.
        Sem ele não dá para conferir. Depois disso o app funciona mesmo sem internet.</p>
@@ -316,6 +320,7 @@ dialog .conta-erro{padding:8px 22px 0;min-height:18px;color:var(--erro);font-siz
 <!-- relatório carregado -->
 <div id="tela-conf" class="oculto"><div class="env">
   <div class="cab-conf" id="resumo"></div>
+  <div class="faixa-mes lembrete-mes oculto"></div>
   <div class="faixa-aviso oculto" id="aviso-velho"></div>
   <div class="faixa-lote oculto" id="lote-novo"></div>
   <div class="cartoes" id="cartoes"></div>
@@ -1989,8 +1994,8 @@ function imprimir(tipo) {
 
   if (tipo === 'tudo' || tipo === 'faltam') {
     corpo += tabela('Apontado e não bipado',
-      ['Produto', 'Descrição', 'Documento', 'Qtd', 'OP', 'Dia', 'Tipo'],
-      semEtiqueta().map(p => [p.produto, p.descricao, p.doc, num(p.qtd), p.op, dm(p),
+      ['Produto', 'Descrição', 'Documento', 'Qtd', 'OP', 'Dia', 'Dias sem bipar', 'Tipo'],
+      semEtiqueta().map(p => [p.produto, p.descricao, p.doc, num(p.qtd), p.op, dm(p), p.dias,
                               p.kos ? 'KOS' : 'GODKS']));
   }
 
@@ -2086,6 +2091,8 @@ let aba = 'problemas';       // aba aberta na lista da direita
 let busca = '';
 let confMostrada = null;
 const barrasAbertas = new Set();
+const DIAS_SEM_BIPAR = 5;      // apontada há mais que isso e ainda sem etiqueta lida: aviso
+const DIAS_FIM_DO_MES = 5;     // lembrete de conferir nos últimos dias do mês
 
 /* Etiqueta bipada que espera uma ação sua (tem o botão Resolver). */
 function precisaAcao(b) {
@@ -2099,7 +2106,7 @@ function contagens() {
     bip: bip.filter(b => b.produto).length, total: (conf.totais || {}).apontamentos || 0, lidas: bip.length,
     prob: bip.filter(precisaAcao).length + (conf.negativos || []).length,
     pend: pend.length, atrasadas: pend.filter(p => p.idade > PRAZO_NORMAL).length,
-    faltam: semEtiqueta().length
+    faltam: semEtiqueta().length, faltamVelhas: semEtiqueta().filter(p => p.dias > DIAS_SEM_BIPAR).length
   };
 }
 
@@ -2127,7 +2134,7 @@ function render() {
     }
     renderResumo(); renderAvisoVelho(); renderCartoes(); renderListas(); pintarLoteNovo(); verificarLotes();
   } else confMostrada = null;
-  renderHistorico();
+  renderHistorico(); renderLembreteMes();
   if (temConf) setTimeout(() => $('campo').focus({ preventScroll: true }), 30);
 }
 
@@ -2180,11 +2187,13 @@ function renderCartoes() {
     c('paradas', 'Transferências paradas', num(n.pend),
       n.atrasadas ? `${num(n.atrasadas)} ${s(n.atrasadas, 'atrasada', 'atrasadas')}` : n.pend ? 'dentro do prazo' : 'nenhuma',
       n.atrasadas ? 'erro' : n.pend ? 'espera' : 'ok') +
-    c('faltam', 'Não bipadas', num(n.faltam), n.faltam ? 'apontadas, sem etiqueta lida' : 'tudo bipado', n.faltam ? '' : 'ok');
+    c('faltam', 'Não bipadas', num(n.faltam),
+      n.faltamVelhas ? `${num(n.faltamVelhas)} há mais de ${DIAS_SEM_BIPAR} dias` : n.faltam ? 'apontadas, sem etiqueta lida' : 'tudo bipado',
+      n.faltamVelhas ? 'aviso' : n.faltam ? '' : 'ok');
   $('cartoes').querySelectorAll('[data-aba]').forEach(b => b.onclick = () => irPara(b.dataset.aba));
   $('n-problemas').textContent = n.prob; $('n-problemas').classList.toggle('erro', n.prob > 0);
   $('n-paradas').textContent = n.pend; $('n-paradas').classList.toggle('erro', n.atrasadas > 0);
-  $('n-faltam').textContent = n.faltam;
+  $('n-faltam').textContent = n.faltam; $('n-faltam').classList.toggle('erro', n.faltamVelhas > 0);
   $('conta-bip').textContent = n.lidas;
 }
 
@@ -2377,18 +2386,21 @@ function renderListas() {
     hf += `<div class="aba-cab">
         <span class="txt">De ${num(n.total)} apontamentos do período você bipou ${num(n.bip)}${
           nJust ? ` e marcou ${num(nJust)} como conferido` : ''}.
+          ${n.faltamVelhas ? `<b style="color:var(--erro)">${num(n.faltamVelhas)} ${n.faltamVelhas === 1 ? 'está' : 'estão'} há mais de ${DIAS_SEM_BIPAR} dias sem bipar.</b>` : ''}
           O que sobra aqui ou ainda está na fábrica, ou chegou na expedição e passou batido. Os mais antigos vêm primeiro.</span>
         <button class="btn btn-min" data-imprimir="faltam">Imprimir lista</button>
       </div>`;
     if (!faltamVistas.length) hf += semResultado;
     hf += faltamVistas.slice(0, 100).map(p => `
-      <div class="parada ${p.ord <= (relDiaCorte()) ? 'grave' : 'leve'}">
+      <div class="parada ${p.dias > DIAS_SEM_BIPAR ? 'grave' : 'leve'}">
         <div class="lin1">
           <span class="nome">${esc(p.descricao)}</span>
           <span class="tipo ${p.kos ? 'kos' : 'godks'}">${p.kos ? 'KOS' : 'GODKS'}</span>
+          <span class="idade${p.dias > DIAS_SEM_BIPAR ? '' : ' calma'}">${p.dias === 0 ? 'hoje' : p.dias === 1 ? '1 dia' : p.dias + ' dias'}</span>
         </div>
         <div class="lin2"><span>produto ${esc(p.produto)}</span><span>doc ${esc(p.doc)}</span>
           <span>${num(p.qtd)} pç</span><span>OP ${esc(p.op)}</span><span>dia ${dm(p)}</span></div>
+        ${p.dias > DIAS_SEM_BIPAR ? `<div class="lin3">Apontada há ${p.dias} dias e a etiqueta ainda não foi bipada. Procure o material na expedição ou confirme com a fábrica.</div>` : ''}
         <div class="lin4"><button class="btn btn-min" data-justificar="${esc(p.chave)}">Já conferi</button></div>
       </div>`).join('');
     if (faltamVistas.length > 100)
@@ -2413,6 +2425,32 @@ function renderListas() {
     b.textContent = abrir ? 'Ocultar código de barras' : 'Ver código de barras';
   });
   if ($('bt-cobranca')) $('bt-cobranca').onclick = () => copiar(textoCobranca(), $('bt-cobranca'));
+}
+
+/* Lembrete nos últimos dias do mês: o ERP não mistura dois meses no relatório,
+   então o que ficar aberto na virada não aparece mais junto com o mês seguinte. */
+function renderLembreteMes() {
+  const hoje = new Date();
+  const ultimo = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
+  const falta = ultimo - hoje.getDate();
+  const caixas = document.querySelectorAll('.lembrete-mes');
+  if (falta >= DIAS_FIM_DO_MES) { caixas.forEach(c => c.classList.add('oculto')); return; }
+  const mes = MESES[hoje.getMonth()];
+  const quando = falta === 0 ? `Hoje é o último dia de ${mes}.` : falta === 1 ? `Amanhã é o último dia de ${mes}.`
+    : `Faltam ${falta} dias para o fim de ${mes}.`;
+  let resto;
+  const doMes = conf && rel && conf.mes === hoje.getMonth() + 1 && conf.ano === hoje.getFullYear();
+  if (doMes) {
+    const n = contagens(), p = (q, um, varios) => `${num(q)} ${q === 1 ? um : varios}`;
+    const abertos = [n.prob ? p(n.prob, 'problema', 'problemas') : '', n.pend ? p(n.pend, 'transferência parada', 'transferências paradas') : '',
+                     n.faltam ? p(n.faltam, 'etiqueta não bipada', 'etiquetas não bipadas') : ''].filter(Boolean);
+    resto = abertos.length
+      ? `Antes da virada, feche o que está aberto nesta conferência: ${abertos.join(', ')}. O relatório do mês que vem não traz os apontamentos de ${mes}.`
+      : 'Esta conferência está em dia. Puxe um último relatório no fechamento para confirmar.';
+  } else {
+    resto = `Puxe a movimentação do dia 1 até hoje e confira antes da virada. O relatório do mês que vem não traz os apontamentos de ${mes}.`;
+  }
+  caixas.forEach(c => { c.innerHTML = `<b>${quando}</b> ${resto}`; c.classList.remove('oculto'); });
 }
 
 /* ---------------- lote novo do celular ----------------
@@ -2479,7 +2517,8 @@ function semEtiqueta() {
       const chave = codigo + '|' + ap.doc;
       if (bipados.has(chave) || justificados.has(chave)) continue;
       fora.push({ produto: codigo, descricao: p.descricao, doc: ap.doc, dia: ap.dia,
-                  mes: ap.mes, ord: ap.ord, qtd: ap.qtd, op: ap.op, kos: !!depara[codigo], chave });
+                  mes: ap.mes, ord: ap.ord, qtd: ap.qtd, op: ap.op, kos: !!depara[codigo], chave,
+                  dias: idadeEmDias(rel, ap) });
     }
   }
   fora.sort((a, b) => a.ord - b.ord || a.produto.localeCompare(b.produto) || a.doc.localeCompare(b.doc));
