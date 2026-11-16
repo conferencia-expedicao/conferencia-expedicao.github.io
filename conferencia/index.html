@@ -6,11 +6,14 @@
 <title>Conferência de etiquetas — GODKS / KOS</title>
 <style>
 :root{
-  --papel:#F2F4F7; --papel2:#FFFFFF; --tinta:#16222E; --tinta2:#4A5B6B;
-  --etiqueta:#1B9FD8; --traco:#C9D2DC; --traco2:#E3E9EF;
-  --ok:#157F4B; --ok-bg:#E6F4EC;
-  --espera:#9A6000; --espera-bg:#FDF2DC;
-  --erro:#C02927; --erro-bg:#FCECEB;
+  --papel:#F4F6FA; --papel2:#FFFFFF; --tinta:#0F1C2B; --tinta2:#5A6B7D; --tinta3:#8A99A8;
+  --etiqueta:#1B9FD8; --azul:#0B6FA4; --azul-bg:#E8F5FC;
+  --traco:#DFE5EC; --traco2:#EEF2F6;
+  --ok:#17875A; --ok-bg:#E6F6EE;
+  --espera:#A86400; --espera-bg:#FFF3DB;
+  --erro:#CF3A32; --erro-bg:#FDECEA;
+  --sombra:0 1px 2px rgba(15,28,43,.05),0 2px 6px rgba(15,28,43,.05);
+  --raio:12px;
   --mono:ui-monospace,"Cascadia Mono","Segoe UI Mono",Consolas,"Liberation Mono",monospace;
   --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
 }
@@ -18,157 +21,205 @@
 html,body{margin:0;padding:0}
 body{background:var(--papel);color:var(--tinta);font-family:var(--sans);font-size:15px;line-height:1.5}
 button{font:inherit;cursor:pointer}
-h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
+h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
+.oculto{display:none!important}
 
-.topo{background:var(--tinta);color:#fff;padding:14px 22px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
-.topo h1{font-size:17px;font-weight:600}
-.topo .rota{font-family:var(--mono);font-size:13px;color:#8FB5CC;letter-spacing:.04em}
-.topo .dir{margin-left:auto;display:flex;gap:8px;align-items:center}
+/* ---- topo ---- */
+.topo{position:sticky;top:0;z-index:6;background:#FFFFFFE6;backdrop-filter:blur(8px);
+      border-bottom:1px solid var(--traco);padding:10px 24px;display:flex;align-items:center;gap:16px}
+.marca-app{display:flex;align-items:center;gap:11px}
+.marca-app .logo{width:34px;height:34px;border-radius:9px;background:var(--etiqueta);flex:none;position:relative;overflow:hidden}
+.marca-app .logo::before{content:'';position:absolute;left:8px;right:8px;top:9px;bottom:9px;
+  background:repeating-linear-gradient(90deg,#07202C 0 2px,transparent 2px 4px,#07202C 4px 5px,transparent 5px 8px)}
+.marca-app .logo::after{content:'';position:absolute;left:4px;right:4px;top:50%;height:2px;margin-top:-1px;background:#F2645F}
+.topo h1{font-size:16px;line-height:1.2}
+.topo .rota{font-family:var(--mono);font-size:11.5px;color:var(--tinta3);letter-spacing:.03em}
+.topo .dir{margin-left:auto;display:flex;gap:10px;align-items:center}
+.nuvem-status{font-size:12.5px;color:var(--ok);background:var(--ok-bg);padding:3px 10px;border-radius:99px}
+.nuvem-status:empty{display:none}
+.nuvem-status.falha{color:var(--espera);background:var(--espera-bg)}
+.quem{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tinta2)}
+.menu-caixa{position:relative}
+.btn-icone{font-size:20px;line-height:1;padding:5px 10px}
+.menu{position:absolute;right:0;top:calc(100% + 6px);min-width:230px;background:var(--papel2);border:1px solid var(--traco);
+      border-radius:var(--raio);box-shadow:0 8px 28px rgba(15,28,43,.14);padding:6px;display:flex;flex-direction:column}
+.menu button,.menu .mudo{background:none;border:0;text-align:left;padding:9px 12px;border-radius:8px;font-size:14px;color:var(--tinta);
+      display:flex;align-items:center;gap:9px;cursor:pointer}
+.menu button:hover,.menu .mudo:hover{background:var(--traco2)}
+.mudo input{accent-color:var(--azul);width:16px;height:16px;margin:0}
 
-.btn{background:var(--papel2);border:1px solid var(--traco);color:var(--tinta);
-     padding:7px 13px;border-radius:3px;font-size:14px}
-.btn:hover{border-color:var(--tinta2)}
-.btn:focus-visible{outline:2px solid var(--etiqueta);outline-offset:2px}
-.btn-claro{background:transparent;border-color:#39536A;color:#D7E5EE}
-.btn-claro:hover{border-color:#6E8CA3;background:#1F3140}
-.btn-forte{background:var(--tinta);border-color:var(--tinta);color:#fff}
-.btn-forte:hover{background:#24394C}
-.btn-min{padding:4px 9px;font-size:13px}
+/* ---- botões ---- */
+.btn{background:var(--papel2);border:1px solid var(--traco);color:var(--tinta);padding:8px 14px;border-radius:8px;
+     font-size:14px;font-weight:500;transition:background .12s,border-color .12s}
+.btn:hover{background:#F7F9FB;border-color:#C5CFDA}
+.btn:focus-visible,.aba:focus-visible,.cartao:focus-visible{outline:2px solid var(--etiqueta);outline-offset:2px}
+.btn-claro{background:transparent;border-color:transparent;color:var(--tinta2)}
+.btn-claro:hover{background:var(--traco2);border-color:transparent}
+.btn-forte{background:var(--azul);border-color:var(--azul);color:#fff}
+.btn-forte:hover{background:#095E8C;border-color:#095E8C}
+.btn-min{padding:5px 11px;font-size:13px}
+.btn[disabled]{opacity:.5;cursor:default}
 
-.env{max-width:1280px;margin:0 auto;padding:0 22px}
-.faixa{border-bottom:1px solid var(--traco);background:var(--papel2)}
-.faixa .env{padding-top:13px;padding-bottom:13px}
+.env{max-width:1320px;margin:0 auto;padding:0 24px}
+.painel{background:var(--papel2);border:1px solid var(--traco);border-radius:var(--raio);box-shadow:var(--sombra);padding:18px}
+.tit-painel{font-size:13px;font-weight:650;color:var(--tinta2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
 
 /* ---- carga ---- */
-.carga{max-width:680px;margin:48px auto;padding:0 22px}
-.alvo{border:2px dashed var(--traco);border-radius:4px;background:var(--papel2);
-      padding:44px 28px;text-align:center}
-.alvo.sobre{border-color:var(--etiqueta);background:#F0F9FD}
-.alvo h2{font-size:19px;margin-bottom:6px}
+.carga{max-width:680px;margin:44px auto 28px;padding:0 24px}
+.alvo{border:2px dashed #C5CFDA;border-radius:16px;background:var(--papel2);padding:46px 28px;text-align:center;
+      transition:border-color .12s,background .12s}
+.alvo.sobre{border-color:var(--etiqueta);background:var(--azul-bg)}
+.alvo h2{font-size:20px;margin-bottom:6px}
 .alvo p{color:var(--tinta2);margin:0 0 18px}
-.oculto{display:none}
+.sem-cadastro{border:1px solid #EBCB8B;background:var(--espera-bg);color:var(--tinta);border-radius:var(--raio);
+              padding:14px 16px;margin-bottom:16px;display:flex;gap:14px;align-items:center}
+.sem-cadastro p{margin:0;flex:1}
 
-/* ---- resumo do relatório ---- */
-.resumo{display:flex;gap:26px;align-items:baseline;flex-wrap:wrap}
-.resumo .periodo{font-size:16px;font-weight:600}
-.resumo .num{color:var(--tinta2);font-size:14px}
-.resumo .num b{font-family:var(--mono);font-weight:600;color:var(--tinta)}
-.resumo .acoes{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+/* ---- cabeçalho da conferência ---- */
+.cab-conf{display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:22px 0 14px}
+.cab-conf .periodo{font-size:21px;font-weight:650;letter-spacing:-.015em;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cab-conf .nota-mes{color:var(--espera);font-size:14px;font-weight:500}
+.cab-conf .num{color:var(--tinta2);font-size:13.5px;margin-top:2px}
+.cab-conf .num b{font-weight:650;color:var(--tinta);font-variant-numeric:tabular-nums}
+.cab-conf .acoes{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.sit{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:650;padding:2px 10px;border-radius:99px}
+.sit::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
+.sit.concluida{color:var(--ok);background:var(--ok-bg)} .sit.espera{color:var(--espera);background:var(--espera-bg)}
 
-/* ---- corpo ---- */
-.corpo{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:0;
-       max-width:1280px;margin:0 auto}
-.col{padding:24px 22px;min-width:0}
-.col+.col{border-left:1px solid var(--traco)}
-@media(max-width:900px){.corpo{grid-template-columns:1fr}.col+.col{border-left:0;border-top:1px solid var(--traco)}}
+.faixa-aviso,.faixa-lote{border-radius:var(--raio);padding:11px 16px;margin-bottom:14px;font-size:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.faixa-aviso{background:var(--espera-bg);border:1px solid #EBCB8B;color:#5C3A00;display:block}
+.faixa-lote{background:var(--azul-bg);border:1px solid #B5DDF2}
+.faixa-lote .txt{flex:1;min-width:200px}
+.faixa-lote .ponto{width:9px;height:9px;border-radius:50%;background:var(--etiqueta);flex:none;box-shadow:0 0 0 4px #1B9FD833}
 
-.secao{margin-bottom:28px}
-.secao>h2{font-size:14px;font-weight:600;color:var(--tinta2);
-          padding-bottom:7px;border-bottom:1px solid var(--traco);margin-bottom:14px;
-          display:flex;align-items:center;gap:9px}
-.secao>h2 .conta{font-family:var(--mono);font-size:13px;background:var(--traco2);
-                 color:var(--tinta);padding:1px 7px;border-radius:9px}
+/* ---- cartões ---- */
+.cartoes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.cartao{background:var(--papel2);border:1px solid var(--traco);border-radius:var(--raio);box-shadow:var(--sombra);
+        padding:14px 16px;text-align:left;display:flex;flex-direction:column;gap:2px;color:var(--tinta);
+        transition:border-color .12s,box-shadow .12s,transform .12s}
+.cartao:hover{border-color:#C5CFDA;transform:translateY(-1px)}
+.cartao.ativo{border-color:var(--etiqueta);box-shadow:0 0 0 3px #1B9FD826,var(--sombra)}
+.cartao .rot{font-size:12px;font-weight:650;color:var(--tinta2);text-transform:uppercase;letter-spacing:.05em}
+.cartao .val{font-size:30px;font-weight:700;line-height:1.15;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.cartao .val small{font-size:15px;font-weight:500;color:var(--tinta2);letter-spacing:0}
+.cartao .sub{font-size:13px;color:var(--tinta2);min-height:20px;display:flex;align-items:center}
+.cartao.erro .val{color:var(--erro)} .cartao.espera .val{color:var(--espera)} .cartao.ok .val{color:var(--ok)}
+.cartao.erro .sub{color:var(--erro)}
+.barra{display:block;width:100%;height:6px;border-radius:99px;background:var(--traco2);overflow:hidden}
+.barra i{display:block;height:100%;border-radius:99px;background:var(--etiqueta)}
+
+/* ---- grade ---- */
+.grade{display:grid;grid-template-columns:minmax(330px,430px) minmax(0,1fr);gap:18px;align-items:start;padding-bottom:40px}
+.grade .bipagem{position:sticky;top:72px}
+@media(max-width:1000px){.grade{grid-template-columns:1fr}.grade .bipagem{position:static}.cartoes{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* ---- bipagem ---- */
-.bipe{position:relative}
-.bipe input{width:100%;font-family:var(--mono);font-size:26px;letter-spacing:.06em;
-  padding:16px 18px;border:2px solid var(--traco);border-radius:4px;background:var(--papel2);
-  color:var(--tinta)}
+.bipe input{width:100%;font-family:var(--mono);font-size:22px;letter-spacing:.04em;padding:14px 16px;
+  border:2px solid var(--traco);border-radius:10px;background:var(--papel2);color:var(--tinta)}
 .bipe input:focus{outline:none;border-color:var(--etiqueta);box-shadow:0 0 0 4px #1B9FD822}
-.bipe input::placeholder{color:#9FAFBD;letter-spacing:0;font-size:17px}
-.dica{color:var(--tinta2);font-size:13px;margin-top:7px;display:flex;align-items:center;
-      gap:11px;flex-wrap:wrap}
-.dica button{margin-left:auto}
+.bipe input::placeholder{color:#9FAFBD;letter-spacing:0;font-size:16px;font-family:var(--sans)}
+.dica{color:var(--tinta2);font-size:13px;margin-top:9px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 
-.lote{margin-top:14px;border:1px solid var(--traco);border-radius:4px;
-      background:var(--papel2);padding:14px}
-.lote.sobre{border-color:var(--etiqueta);background:#F0F9FD}
+.lote{margin-top:14px;border:1px solid var(--traco);border-radius:10px;background:#FAFBFD;padding:14px}
+.lote.sobre{border-color:var(--etiqueta);background:var(--azul-bg)}
 .lote p{margin:0 0 9px;font-size:13.5px;color:var(--tinta2)}
-.lote textarea{width:100%;font-family:var(--mono);font-size:13.5px;padding:10px;
-      border:1px solid var(--traco);border-radius:3px;resize:vertical;color:var(--tinta)}
+.lote textarea{width:100%;font-family:var(--mono);font-size:13.5px;padding:10px;border:1px solid var(--traco);
+      border-radius:8px;resize:vertical;color:var(--tinta)}
 .lote textarea:focus{outline:2px solid var(--etiqueta);outline-offset:1px}
 .lote-acoes{display:flex;gap:8px;margin-top:10px;justify-content:flex-end}
-
-.remoto{display:flex;align-items:center;gap:12px;padding:10px 0;
-        border-bottom:1px solid var(--traco2)}
+.remoto{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--traco2);flex-wrap:wrap}
 .remoto:last-child{border-bottom:0}
-.remoto .nome{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.remoto .meta{font-family:var(--mono);font-size:12.5px;color:var(--tinta2);flex:none}
+.remoto .nome{font-weight:600;flex:1 1 100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.remoto .meta:nth-of-type(3){flex:1}
+.remoto .meta{font-family:var(--mono);font-size:12px;color:var(--tinta2);flex:none}
 .remoto .btn{flex:none}
 .nuvem-aviso{color:var(--tinta2);font-size:13.5px;padding:8px 0}
 
 /* ---- veredito ---- */
-.veredito{margin-top:18px;border-radius:4px;border:1px solid;padding:16px 18px 16px 20px;
-          border-left-width:7px}
-.veredito.vazio{border:1px dashed var(--traco);border-left-width:1px;color:var(--tinta2);
-                text-align:center;padding:30px 18px;background:transparent}
-.veredito.ok{background:var(--ok-bg);border-color:var(--ok)}
-.veredito.atencao{background:var(--espera-bg);border-color:var(--espera)}
-.veredito.erro{background:var(--erro-bg);border-color:var(--erro)}
-.veredito .titulo{font-size:23px;font-weight:650;line-height:1.2;letter-spacing:-.015em}
-.veredito.ok .titulo{color:var(--ok)} .veredito.atencao .titulo{color:var(--espera)}
-.veredito.erro .titulo{color:var(--erro)}
-.veredito .prod{font-size:15px;margin-top:5px}
-.veredito .prod code{font-family:var(--mono);font-weight:600}
-.veredito .det{margin-top:9px;font-size:14.5px;color:var(--tinta);max-width:62ch}
-.veredito .campos{margin-top:12px;font-family:var(--mono);font-size:13.5px;color:var(--tinta2);
-                  display:flex;gap:18px;flex-wrap:wrap}
+.veredito{margin-top:16px;border-radius:10px;border:1px solid;padding:16px 18px}
+.veredito.vazio{border:1px dashed var(--traco);color:var(--tinta3);text-align:center;padding:26px 18px;background:transparent;font-size:14px}
+.veredito.ok{background:var(--ok-bg);border-color:#A9DCC2}
+.veredito.atencao{background:var(--espera-bg);border-color:#EBCB8B}
+.veredito.erro{background:var(--erro-bg);border-color:#F0B5B0}
+.veredito .titulo{font-size:21px;font-weight:700;line-height:1.2;letter-spacing:-.015em}
+.veredito.ok .titulo{color:var(--ok)} .veredito.atencao .titulo{color:var(--espera)} .veredito.erro .titulo{color:var(--erro)}
+.veredito .prod{font-size:15px;margin-top:5px;font-weight:500}
+.veredito .det{margin-top:8px;font-size:14px;color:var(--tinta)}
+.veredito .campos{margin-top:11px;font-family:var(--mono);font-size:12.5px;color:var(--tinta2);display:flex;gap:6px 16px;flex-wrap:wrap}
 .veredito .campos b{color:var(--tinta);font-weight:600}
-.veredito .aviso{margin-top:9px;font-size:14px;padding:7px 11px;border-radius:3px;
-                 background:#ffffffAA;border:1px solid var(--traco)}
+.veredito .aviso{margin-top:9px;font-size:13.5px;padding:7px 11px;border-radius:8px;background:#ffffffB0;border:1px solid var(--traco)}
+
+/* ---- abas ---- */
+.listas{padding:0;overflow:hidden}
+.abas-linha{display:flex;align-items:center;gap:12px;padding:8px 14px 0;border-bottom:1px solid var(--traco);flex-wrap:wrap}
+.abas{display:flex;gap:2px;flex-wrap:wrap}
+.aba{background:none;border:0;border-bottom:2px solid transparent;padding:11px 12px 10px;font-size:14px;font-weight:600;
+     color:var(--tinta2);display:flex;align-items:center;gap:7px;margin-bottom:-1px;border-radius:8px 8px 0 0}
+.aba:hover{color:var(--tinta);background:var(--traco2)}
+.aba.ativo{color:var(--azul);border-bottom-color:var(--etiqueta)}
+.conta{font-size:12px;font-weight:650;background:var(--traco2);color:var(--tinta2);padding:1px 8px;border-radius:99px;
+       font-variant-numeric:tabular-nums}
+.aba.ativo .conta{background:var(--azul-bg);color:var(--azul)}
+.conta.erro{background:var(--erro-bg);color:var(--erro)}
+#busca{margin-left:auto;margin-bottom:7px;flex:1 1 130px;max-width:250px;min-width:0;padding:8px 12px;border:1px solid var(--traco);border-radius:8px;
+       font:inherit;font-size:14px;background:#FAFBFD;color:var(--tinta)}
+#busca:focus{outline:none;border-color:var(--etiqueta);box-shadow:0 0 0 3px #1B9FD822;background:#fff}
+.aba-corpo{padding:16px 18px 20px}
+.aba-cab{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.aba-cab .txt{flex:1;min-width:220px;color:var(--tinta2);font-size:13.5px}
+.sub-tit{font-size:13px;font-weight:650;color:var(--tinta2);text-transform:uppercase;letter-spacing:.05em;margin:22px 0 10px;
+         display:flex;align-items:center;gap:8px}
+.nada{color:var(--tinta2);font-size:14px;padding:10px 0}
+.vazio-bom{text-align:center;padding:34px 16px;color:var(--tinta2);font-size:14.5px}
+.vazio-bom b{display:block;color:var(--ok);font-size:16px;margin-bottom:3px}
 
 /* ---- lista de bipadas ---- */
 .bipadas{list-style:none;margin:0;padding:0}
-.bipadas li{display:flex;gap:11px;align-items:baseline;padding:8px 0;
-            border-bottom:1px solid var(--traco2);font-size:14px}
+.bipadas li{display:flex;gap:11px;align-items:baseline;padding:9px 8px;border-bottom:1px solid var(--traco2);font-size:14px;
+            flex-wrap:wrap;border-radius:8px}
+.bipadas li:hover{background:#FAFBFD}
 .bipadas li:last-child{border-bottom:0}
-.bipadas li{flex-wrap:wrap}
-.bipadas .motivo{flex-basis:100%;padding-left:20px;margin-top:-3px;font-size:12.5px;line-height:1.4;color:var(--tinta2)}
+.bipadas .motivo{flex-basis:100%;padding-left:20px;margin-top:-2px;font-size:12.5px;line-height:1.4;color:var(--tinta2)}
 .bipadas .motivo.atencao{color:var(--espera)} .bipadas .motivo.erro{color:var(--erro)}
 .marca{width:9px;height:9px;border-radius:50%;flex:none;position:relative;top:1px}
-.marca.ok{background:var(--ok)} .marca.atencao{background:var(--espera)} .marca.erro{background:var(--erro)}
-.bipadas .pos{font-family:var(--mono);font-size:12px;color:var(--tinta2);
-              min-width:20px;text-align:right}
+.marca.ok{background:var(--ok)} .marca.atencao{background:#E0A020} .marca.erro{background:var(--erro)}
+.bipadas .pos{font-family:var(--mono);font-size:12px;color:var(--tinta3);min-width:24px;text-align:right}
 .bipadas .cod{font-family:var(--mono);font-size:13px;color:var(--tinta2)}
 .bipadas .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bipadas .vd{font-size:13px;color:var(--tinta2);text-align:right;flex:none}
 
-/* ---- pendências ---- */
-.parada{border:1px solid var(--traco);border-left:5px solid var(--espera);
-        border-radius:3px;background:var(--papel2);padding:12px 14px;margin-bottom:10px}
+/* ---- paradas e não bipadas ---- */
+.parada{border:1px solid var(--traco);border-left:4px solid #E0A020;border-radius:10px;background:var(--papel2);
+        padding:12px 14px;margin-bottom:10px}
 .parada.grave{border-left-color:var(--erro)}
-.parada.leve{border-left-color:var(--tinta2)}
+.parada.leve{border-left-color:#C5CFDA}
 .parada .lin1{display:flex;gap:10px;align-items:baseline}
 .parada .nome{font-weight:600;font-size:14.5px;flex:1;min-width:0}
-.parada .idade{font-family:var(--mono);font-size:12.5px;color:var(--espera);
-               background:var(--espera-bg);padding:1px 7px;border-radius:9px;flex:none}
+.parada .idade{font-size:12.5px;font-weight:650;color:var(--espera);background:var(--espera-bg);padding:1px 9px;border-radius:99px;flex:none}
 .parada.grave .idade{color:var(--erro);background:var(--erro-bg)}
 .parada .idade.calma{color:var(--tinta2);background:var(--traco2)}
-.parada .tipo{font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.03em;
-              padding:2px 8px;border-radius:9px;flex:none}
-.parada .tipo.kos{color:#0C6C93;background:#1B9FD81F}
+.parada .tipo{font-size:11.5px;font-weight:700;letter-spacing:.03em;padding:2px 9px;border-radius:99px;flex:none}
+.parada .tipo.kos{color:var(--azul);background:var(--azul-bg)}
 .parada .tipo.godks{color:var(--tinta2);background:var(--traco2)}
-.parada .lin2{font-family:var(--mono);font-size:13px;color:var(--tinta2);margin-top:5px;
-              display:flex;gap:16px;flex-wrap:wrap}
+.parada .lin2{font-family:var(--mono);font-size:12.5px;color:var(--tinta2);margin-top:5px;display:flex;gap:4px 16px;flex-wrap:wrap}
 .parada .lin3{font-size:13.5px;color:var(--tinta2);margin-top:7px}
-.parada .lin4{margin-top:9px;display:flex;gap:8px}
-
-.nada{color:var(--tinta2);font-size:14px;padding:10px 0}
+.parada .lin4{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.etq{margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#F7F9FB;border:1px solid var(--traco2);
+     border-radius:8px;padding:7px 10px}
+.etq-rot{font-size:11.5px;font-weight:650;color:var(--tinta2);text-transform:uppercase;letter-spacing:.05em}
+.etq code{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:.03em;user-select:all;flex:1;min-width:230px}
+.etq-barras{margin-top:8px;padding:10px;background:#fff;border:1px solid var(--traco2);border-radius:8px;text-align:center;overflow-x:auto}
+.etq-barras svg{max-width:100%}
 
 /* ---- histórico ---- */
-.hist{border-top:1px solid var(--traco);background:var(--papel2);margin-top:8px}
-.hist .env{padding:22px}
+.hist{margin:8px 0 40px}
 .htab{width:100%;border-collapse:collapse;font-size:14px}
-.htab th{text-align:left;font-weight:600;color:var(--tinta2);font-size:13px;
-         padding:0 12px 7px 0;border-bottom:1px solid var(--traco)}
-.htab td{padding:9px 12px 9px 0;border-bottom:1px solid var(--traco2)}
+.htab th{text-align:left;font-weight:650;color:var(--tinta2);font-size:12px;text-transform:uppercase;letter-spacing:.05em;
+         padding:0 12px 8px 0;border-bottom:1px solid var(--traco)}
+.htab td{padding:10px 12px 10px 0;border-bottom:1px solid var(--traco2)}
 .htab tr:last-child td{border-bottom:0}
 .htab .acoes-linha{display:flex;gap:7px;justify-content:flex-end;align-items:center}
 .htab .mono{font-family:var(--mono);font-size:13px}
-.sit{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
-.sit.concluida{color:var(--ok)} .sit.espera{color:var(--espera)}
-
-.secao>h2 .imprime{margin-left:auto;font-weight:400}
 
 /* ---- impressão ---- */
 #impressao{display:none}
@@ -179,8 +230,7 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
   .folha{font-family:var(--sans);color:#000;font-size:10.5pt}
   .folha h1{font-size:16pt;margin:0 0 2mm}
   .folha .sub{margin:0 0 1mm;font-size:9.5pt;color:#333}
-  .folha h2{font-size:11.5pt;margin:7mm 0 2mm;padding-bottom:1mm;
-            border-bottom:1pt solid #000;page-break-after:avoid}
+  .folha h2{font-size:11.5pt;margin:7mm 0 2mm;padding-bottom:1mm;border-bottom:1pt solid #000;page-break-after:avoid}
   .folha h2 .n{font-weight:400;color:#444}
   .folha table{width:100%;border-collapse:collapse;font-size:9pt;page-break-inside:auto}
   .folha th{text-align:left;border-bottom:.6pt solid #000;padding:1.5mm 2mm 1.5mm 0;font-size:8.5pt}
@@ -189,49 +239,61 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
   .folha td:first-child,.folha td:nth-child(3){font-family:var(--mono)}
   .folha .rodape{margin-top:8mm;font-size:9pt;color:#333;page-break-inside:avoid}
   .folha .vazio{font-size:10pt;color:#333}
+  .cb-grade{display:grid;grid-template-columns:1fr 1fr;gap:5mm 8mm;margin-top:6mm}
+  .cb{break-inside:avoid;page-break-inside:avoid;border:.3pt solid #999;border-radius:1.5mm;padding:3mm}
+  .cb-nome{font-size:9.5pt;font-weight:700}
+  .cb-meta{font-size:8pt;color:#333;margin-bottom:2mm}
+  .cb svg{display:block;width:78mm;height:15mm}
+  .cb-num{font-family:var(--mono);font-size:10pt;letter-spacing:.06em;margin-top:1mm}
   @page{margin:14mm}
 }
 
-dialog{border:1px solid var(--traco);border-radius:5px;padding:0;max-width:440px;width:92%;
-       color:var(--tinta);font-family:var(--sans)}
-dialog::backdrop{background:#16222E99}
-dialog .cab{padding:16px 20px 0;font-size:17px;font-weight:600}
-dialog .cor{padding:10px 20px 0;color:var(--tinta2);font-size:14px}
-dialog .pe{padding:16px 20px 18px;display:flex;gap:8px;justify-content:flex-end}
-dialog input[type=text]{width:100%;padding:9px 11px;border:1px solid var(--traco);
-       border-radius:3px;font:inherit;margin-top:12px}
+/* ---- diálogos ---- */
+dialog{border:1px solid var(--traco);border-radius:14px;padding:0;max-width:460px;width:92%;color:var(--tinta);
+       font-family:var(--sans);box-shadow:0 18px 50px rgba(15,28,43,.25)}
+dialog::backdrop{background:#0F1C2B80}
+dialog .cab{padding:18px 22px 0;font-size:17px;font-weight:650}
+dialog .cor{padding:10px 22px 0;color:var(--tinta2);font-size:14px}
+dialog .pe{padding:18px 22px 20px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+dialog input[type=text],dialog input[type=email],dialog input[type=password]{width:100%;padding:10px 12px;
+       border:1px solid var(--traco);border-radius:8px;font:inherit;margin-top:12px;color:var(--tinta)}
 dialog input:focus{outline:2px solid var(--etiqueta);outline-offset:1px}
+dialog .campos{padding:2px 22px 0}
+dialog .conta-erro{padding:8px 22px 0;min-height:18px;color:var(--erro);font-size:13.5px}
+.sugestoes{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.sugestoes button{background:var(--traco2);border:1px solid transparent;border-radius:99px;padding:5px 12px;font-size:13px;color:var(--tinta)}
+.sugestoes button:hover{background:var(--azul-bg);border-color:#B5DDF2;color:var(--azul)}
 
-.nuvem-status{font-size:12.5px;color:#8FB5CC;margin-right:4px}
-.nuvem-status.falha{color:#F2B8B5}
-.quem{display:flex;align-items:center;gap:8px;font-size:13px;color:#A9C4D4;margin-right:6px}
-dialog input[type=email],dialog input[type=password]{width:100%;padding:9px 11px;border:1px solid var(--traco);
-       border-radius:3px;font:inherit;margin-top:10px}
-dialog .campos{padding:2px 20px 0}
-dialog .conta-erro{padding:8px 20px 0;min-height:18px;color:var(--erro);font-size:13.5px}
-.sem-cadastro{border:1px solid var(--espera);background:var(--espera-bg);color:var(--tinta);border-radius:4px;
-              padding:14px 16px;margin-bottom:16px;display:flex;gap:14px;align-items:center}
-.sem-cadastro p{margin:0;flex:1}
-.mudo{display:flex;align-items:center;gap:7px;font-size:13px;color:#A9C4D4}
-.mudo input{accent-color:var(--etiqueta)}
 @media (prefers-reduced-motion:no-preference){
   .veredito{animation:entra .14s ease-out}
   @keyframes entra{from{opacity:.4;transform:translateY(-3px)}to{opacity:1;transform:none}}
 }
+.aba-corpo .painel{border:0;box-shadow:none;padding:0}
+.aba-corpo .tit-painel{display:none}
 </style>
 </head>
 <body>
 
 <header class="topo">
-  <h1>Conferência de etiquetas</h1>
-  <span class="rota">GODKS &rarr; KOS · v4</span>
+  <div class="marca-app">
+    <span class="logo" aria-hidden="true"></span>
+    <div>
+      <h1>Conferência de etiquetas</h1>
+      <span class="rota">GODKS &rarr; KOS · v5</span>
+    </div>
+  </div>
   <div class="dir">
     <span class="nuvem-status" id="nuvem-status"></span>
     <span class="quem" id="quem"></span>
-    <label class="mudo"><input type="checkbox" id="som" checked> som</label>
-    <button class="btn btn-claro btn-min" id="bt-cadastro">Atualizar cadastro</button>
-    <button class="btn btn-claro btn-min" id="bt-exportar">Exportar backup</button>
-    <button class="btn btn-claro btn-min" id="bt-importar">Importar</button>
+    <div class="menu-caixa">
+      <button class="btn btn-claro btn-icone" id="bt-menu" aria-haspopup="true" aria-expanded="false" aria-label="Mais opções">&#8943;</button>
+      <div class="menu oculto" id="menu">
+        <label class="mudo"><input type="checkbox" id="som" checked> Som ao bipar</label>
+        <button id="bt-cadastro">Atualizar cadastro KOS</button>
+        <button id="bt-exportar">Exportar backup</button>
+        <button id="bt-importar">Importar backup</button>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -252,54 +314,72 @@ dialog .conta-erro{padding:8px 20px 0;min-height:18px;color:var(--erro);font-siz
 </section>
 
 <!-- relatório carregado -->
-<div id="tela-conf" class="oculto">
-  <div class="faixa"><div class="env resumo" id="resumo"></div></div>
-  <div class="corpo">
-    <div class="col">
-      <div class="secao">
-        <h2>Bipagem</h2>
-        <div class="bipe">
-          <input id="campo" autocomplete="off" autocapitalize="off" spellcheck="false"
-                 placeholder="bipe a etiqueta ou digite o código">
-          <div class="dica" id="dica">O cursor fica aqui. Pode bipar uma atrás da outra.
-            <span style="margin-left:auto;display:flex;gap:7px">
-              <button class="btn btn-min" id="bt-nuvem">Buscar do celular</button>
-              <button class="btn btn-min" id="bt-lote">Colar lote</button>
-            </span></div>
+<div id="tela-conf" class="oculto"><div class="env">
+  <div class="cab-conf" id="resumo"></div>
+  <div class="faixa-aviso oculto" id="aviso-velho"></div>
+  <div class="faixa-lote oculto" id="lote-novo"></div>
+  <div class="cartoes" id="cartoes"></div>
+
+  <div class="grade">
+    <section class="painel bipagem">
+      <h2 class="tit-painel">Bipagem</h2>
+      <div class="bipe">
+        <input id="campo" autocomplete="off" autocapitalize="off" spellcheck="false"
+               placeholder="bipe a etiqueta ou digite o código">
+        <div class="dica" id="dica">
+          <span style="flex:1;min-width:150px">O cursor fica aqui. Pode bipar uma atrás da outra.</span>
+          <button class="btn btn-min" id="bt-nuvem">Buscar do celular</button>
+          <button class="btn btn-min" id="bt-lote">Colar lote</button>
         </div>
-        <div class="lote oculto" id="nuvem">
-          <p>Lotes enviados do celular. Escolha qual conferir.</p>
-          <div id="nuvem-lista"></div>
-          <div class="lote-acoes">
-            <button class="btn" id="bt-nuvem-fechar">Fechar</button>
-            <button class="btn" id="bt-nuvem-recarregar">Atualizar</button>
-          </div>
-        </div>
-        <div class="lote oculto" id="lote">
-          <p>Cole aqui os códigos vindos do coletor, um por linha, ou solte o arquivo .txt.</p>
-          <textarea id="lote-texto" rows="5" spellcheck="false"
-                    placeholder="1234560000001000010012&#10;1234560000002000020024"></textarea>
-          <div class="lote-acoes">
-            <button class="btn" id="bt-lote-arquivo">Escolher arquivo</button>
-            <button class="btn" id="bt-lote-cancelar">Cancelar</button>
-            <button class="btn btn-forte" id="bt-lote-conferir">Conferir lote</button>
-          </div>
-        </div>
-        <div class="veredito vazio" id="veredito">Nenhuma etiqueta bipada ainda.</div>
       </div>
-      <div class="secao">
-        <h2>Bipadas nesta conferência <span class="conta" id="conta-bip">0</span></h2>
+      <div class="lote oculto" id="nuvem">
+        <p>Lotes enviados do celular. Escolha qual conferir.</p>
+        <div id="nuvem-lista"></div>
+        <div class="lote-acoes">
+          <button class="btn btn-min" id="bt-nuvem-fechar">Fechar</button>
+          <button class="btn btn-min" id="bt-nuvem-recarregar">Atualizar</button>
+        </div>
+      </div>
+      <div class="lote oculto" id="lote">
+        <p>Cole aqui os códigos vindos do coletor, um por linha, ou solte o arquivo .txt.</p>
+        <textarea id="lote-texto" rows="5" spellcheck="false"
+                  placeholder="1234560000001000010012&#10;1234560000002000020024"></textarea>
+        <div class="lote-acoes">
+          <button class="btn btn-min" id="bt-lote-arquivo">Escolher arquivo</button>
+          <button class="btn btn-min" id="bt-lote-cancelar">Cancelar</button>
+          <button class="btn btn-forte btn-min" id="bt-lote-conferir">Conferir lote</button>
+        </div>
+      </div>
+      <div class="veredito vazio" id="veredito">Nenhuma etiqueta bipada ainda.</div>
+    </section>
+
+    <section class="painel listas">
+      <div class="abas-linha">
+        <div class="abas" id="abas" role="tablist">
+          <button class="aba" role="tab" data-aba="problemas">Problemas <span class="conta" id="n-problemas">0</span></button>
+          <button class="aba" role="tab" data-aba="paradas">Paradas <span class="conta" id="n-paradas">0</span></button>
+          <button class="aba" role="tab" data-aba="faltam">Não bipadas <span class="conta" id="n-faltam">0</span></button>
+          <button class="aba" role="tab" data-aba="bipadas">Bipadas <span class="conta" id="conta-bip">0</span></button>
+          <button class="aba" role="tab" data-aba="historico">Histórico</button>
+        </div>
+        <input id="busca" type="search" autocomplete="off" spellcheck="false" placeholder="buscar"
+               aria-label="Buscar nas listas">
+      </div>
+      <div class="aba-corpo" id="aba-problemas"></div>
+      <div class="aba-corpo" id="aba-paradas"></div>
+      <div class="aba-corpo" id="aba-faltam"></div>
+      <div class="aba-corpo" id="aba-bipadas">
         <ul class="bipadas" id="lista-bip"></ul>
         <div class="nada" id="nada-bip">A lista aparece conforme você bipa.</div>
       </div>
-    </div>
-    <div class="col" id="coluna-paradas"></div>
+      <div class="aba-corpo" id="aba-historico"></div>
+    </section>
   </div>
-</div>
+</div></div>
 
-<section class="hist"><div class="env">
-  <div class="secao" style="margin:0">
-    <h2>Conferências</h2>
+<section class="hist" id="hist-fora"><div class="env">
+  <div class="painel" id="hist-bloco">
+    <h2 class="tit-painel">Conferências</h2>
     <table class="htab" id="htab"><tbody></tbody></table>
     <div class="nada" id="nada-hist">A primeira conferência aparece aqui depois que você carregar um relatório.</div>
   </div>
@@ -1000,7 +1080,7 @@ const GUARDA_LINHAS = 8;   // relatórios completos mantidos para reabrir depois
 const $ = id => document.getElementById(id);
 
 /* ---------------- estado persistido ---------------- */
-function vazio() { return { versao: 1, conferencias: [], fatoresPacote: {}, depara: null }; }
+function vazio() { return { versao: 1, conferencias: [], fatoresPacote: {}, depara: null, lotesVistos: [] }; }
 
 function carregar() {
   try {
@@ -1215,13 +1295,23 @@ function perguntar(titulo, corpo, opcoes) {
   });
 }
 
-function pedirTexto(titulo, corpo, rotuloOk) {
+function pedirTexto(titulo, corpo, rotuloOk, sugestoes) {
   return new Promise(res => {
     $('dlg-cab').textContent = titulo;
     $('dlg-cor').innerHTML = '';
     $('dlg-cor').textContent = corpo;
     const inp = document.createElement('input');
-    inp.type = 'text'; inp.placeholder = 'observação (opcional)';
+    inp.type = 'text'; inp.placeholder = sugestoes && sugestoes.length ? 'escolha um motivo acima ou escreva o seu' : 'observação (opcional)';
+    if (sugestoes && sugestoes.length) {
+      const cx = document.createElement('div'); cx.className = 'sugestoes';
+      for (const s of sugestoes) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.textContent = s;
+        b.onclick = () => { inp.value = s; inp.focus(); };
+        cx.appendChild(b);
+      }
+      $('dlg-cor').appendChild(cx);
+    }
     $('dlg-cor').appendChild(inp);
     $('dlg-pe').innerHTML = '';
     const cancelar = document.createElement('button');
@@ -1516,6 +1606,7 @@ async function listarRemotos() {
     return;
   }
   alvo.innerHTML = '<div class="nuvem-aviso">Buscando...</div>';
+  verificarLotes(true);
   let lotes;
   try {
     lotes = await Conta.api('lotes?select=id,nome,quantidade,criado_em&order=criado_em.desc&limit=25');
@@ -1559,6 +1650,7 @@ async function apagarRemoto(id) {
   if (!vai) return;
   try {
     await Conta.api(`lotes?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+    lotesBanco = lotesBanco.filter(l => l.id !== id); pintarLoteNovo();
     listarRemotos();
   } catch (err) { aviso('Não consegui apagar', err.message); }
 }
@@ -1593,7 +1685,7 @@ async function resolverPendencia(idx) {
   if (!p) return;
   const obs = await pedirTexto('Marcar transferência como feita',
     `${p.descricao} — documento ${p.doc}, ${num(p.qtd)} pç. Some das paradas e fica registrada na conferência.`,
-    'Marcar resolvida');
+    'Marcar resolvida', ['Transferi agora no ERP', 'Transferida, falta puxar relatório novo', 'Não vai ser transferida']);
   if (obs === null) return;
   conf.pendencias.splice(idx, 1);
   conf.resolvidas = (conf.resolvidas || []).concat([
@@ -1601,11 +1693,21 @@ async function resolverPendencia(idx) {
   recalcularSituacao(conf); salvar(); render();
 }
 
+function motivosProntos(b) {
+  const t = (b.titulo || '') + ' ' + (b.aviso || '');
+  if (/Ordem de produção diferente/.test(t)) return ['OP digitada errada, material conferido', 'Etiqueta impressa com OP errada, material conferido'];
+  if (/não escaneou/.test(t)) return ['Fábrica vai apontar', 'Material devolvido para a fábrica'];
+  if (/Quantidade|caixa/.test(t)) return ['Material contado, quantidade certa', 'Diferença avisada à fábrica'];
+  if (/atrasada|Transferência com quantidade/.test(t)) return ['Transferi agora no ERP', 'Transferência cobrada'];
+  if (/período anterior|fora do relatório/.test(t)) return ['Etiqueta de outro mês, já conferida', 'Material conferido'];
+  return ['Material conferido'];
+}
+
 async function resolverBipada(i) {
   const b = conf.bipadas[i];
   if (!b) return;
   const obs = await pedirTexto('Marcar etiqueta como resolvida',
-    `${b.titulo} — ${b.nome || b.cod}. ` + (b.nivel === 'erro' ? 'Deixa de travar a conferência. ' : '') + (b.aviso ? b.aviso + ' ' : '') + 'Escreva o motivo e ele fica registrado na impressão.', 'Marcar resolvida');
+    `${b.titulo} — ${b.nome || b.cod}. ` + (b.nivel === 'erro' ? 'Deixa de travar a conferência. ' : '') + (b.aviso ? b.aviso + ' ' : '') + 'O motivo fica registrado na impressão.', 'Marcar resolvida', motivosProntos(b));
   if (obs === null) return;
   b.resolvida = true; b.obs = obs;
   recalcularSituacao(conf); salvar(); render();
@@ -1629,7 +1731,7 @@ async function ignorarNegativo(idx) {
   if (!n) return;
   const obs = await pedirTexto('Baixar o negativo',
     `${n.descricao} — documento ${n.doc}, ${num(n.qtd)} pç. Use depois de acertar o estoque no sistema.`,
-    'Marcar resolvido');
+    'Marcar resolvido', ['Estoque acertado no ERP']);
   if (obs === null) return;
   conf.negativos.splice(idx, 1);
   conf.resolvidas = (conf.resolvidas || []).concat([
@@ -1784,6 +1886,7 @@ async function sincronizar() {
   try { await puxarDoBanco(); nuvem = { ok: true, em: Date.now() }; }
   catch (err) { nuvem = { ok: false, erro: err.message }; }
   pintarNuvem();
+  verificarLotes(true);
 }
 
 function abrirEntrar(texto) {
@@ -1843,7 +1946,8 @@ function imprimir(tipo) {
   const nBip = (conf.bipadas || []).filter(b => b.produto).length;
   const titulos = { tudo: 'Conferência de etiquetas',
                     paradas: 'Transferências pendentes',
-                    faltam: 'Apontamentos sem etiqueta bipada' };
+                    faltam: 'Apontamentos sem etiqueta bipada',
+                    codigos: 'Etiquetas das transferências paradas' };
 
   let corpo = '';
 
@@ -1878,6 +1982,19 @@ function imprimir(tipo) {
                             : `transferência no dia ${dd(p.resolvidaEm ? p.resolvidaEm.dia : 0)}`]));
   }
 
+  if (tipo === 'codigos') {
+    const itens = (conf.pendencias || []).map(p => ({ p, cod: codigoDaEtiqueta(p) })).filter(x => x.cod)
+      .sort((a, b) => b.p.idade - a.p.idade);
+    if (itens.length) corpo += '<div class="cb-grade">' + itens.map(({ p, cod }) => `
+      <div class="cb">
+        <div class="cb-nome">${esc(p.descricao)}</div>
+        <div class="cb-meta">doc ${esc(p.doc)} · ${num(p.qtd)} pç · apontado em ${dm(p)} · ${p.idade} ${p.idade === 1 ? 'dia' : 'dias'}${
+          p.codigoKos ? ' · KOS ' + esc(p.codigoKos) : ''}</div>
+        ${barras(cod)}
+        <div class="cb-num">${cod}</div>
+      </div>`).join('') + '</div>';
+  }
+
   if (!corpo) corpo = '<p class="vazio">Nada pendente neste bloco.</p>';
 
   $('impressao').innerHTML = `
@@ -1893,24 +2010,109 @@ function imprimir(tipo) {
   window.print();
 }
 
+/* ---------------- código de barras (Code 128) ----------------
+   O mesmo tipo das etiquetas da fábrica. Dígitos em quantidade par usam o
+   conjunto C (dois dígitos por símbolo), como na etiqueta de 22 dígitos. */
+const C128 = ('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 ' +
+  '123122 123221 223211 221132 221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 ' +
+  '111323 131123 131321 112313 132113 132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 ' +
+  '231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 314111 221411 431111 111224 111422 121124 121421 ' +
+  '141122 141221 112214 112412 122114 122411 142112 142211 241211 221114 413111 241112 134111 111242 121142 121241 114212 ' +
+  '124112 124211 411212 421112 421211 212141 214121 412121 111143 111341 131141 114113 114311 411113 411311 113141 114131 ' +
+  '311141 411131 211412 211214 211232 2331112').split(' ');
+
+function simbolos128(texto) {
+  const t = String(texto);
+  let v;
+  if (/^\d+$/.test(t) && t.length % 2 === 0) {
+    v = [105];                                              // início C
+    for (let i = 0; i < t.length; i += 2) v.push(parseInt(t.slice(i, i + 2), 10));
+  } else {
+    v = [104];                                              // início B
+    for (const ch of t) { const n = ch.charCodeAt(0) - 32; if (n < 0 || n > 94) return null; v.push(n); }
+  }
+  let soma = v[0];
+  for (let i = 1; i < v.length; i++) soma += v[i] * i;
+  v.push(soma % 103, 106);                                  // verificador e parada
+  return v;
+}
+
+/* Larguras alternadas barra/espaço, em módulos, começando por barra. */
+function larguras128(texto) {
+  const s = simbolos128(texto);
+  return s ? s.map(n => C128[n]).join('').split('').map(Number) : null;
+}
+
+function barras(texto, altura = 56, modulo = 2) {
+  const l = larguras128(texto);
+  if (!l) return '';
+  const margem = 10;
+  let x = margem, r = '';
+  l.forEach((w, i) => { if (i % 2 === 0) r += `<rect x="${x}" y="0" width="${w}" height="1"/>`; x += w; });
+  const total = x + margem;
+  return `<svg class="barras" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} 1" width="${total * modulo}" height="${altura}" ` +
+         `preserveAspectRatio="none" shape-rendering="crispEdges" role="img" aria-label="código de barras ${texto}">` +
+         `<rect width="${total}" height="1" fill="#fff"/><g fill="#000">${r}</g></svg>`;
+}
+
 /* ---------------- render ---------------- */
+let aba = 'problemas';       // aba aberta na lista da direita
+let busca = '';
+let confMostrada = null;
+const barrasAbertas = new Set();
+
+/* Etiqueta bipada que espera uma ação sua (tem o botão Resolver). */
+function precisaAcao(b) {
+  return !b.resolvida && b.bloqueia !== false &&
+    (b.nivel === 'erro' || (b.nivel === 'atencao' && b.titulo !== 'Aguardando transferência'));
+}
+
+function contagens() {
+  const bip = conf.bipadas || [], pend = conf.pendencias || [];
+  return {
+    bip: bip.filter(b => b.produto).length, total: (conf.totais || {}).apontamentos || 0, lidas: bip.length,
+    prob: bip.filter(precisaAcao).length + (conf.negativos || []).length,
+    pend: pend.length, atrasadas: pend.filter(p => p.idade > PRAZO_NORMAL).length,
+    faltam: semEtiqueta().length
+  };
+}
+
+function melhorAba() {
+  const n = contagens();
+  return n.prob ? 'problemas' : n.pend ? 'paradas' : n.faltam ? 'faltam' : 'bipadas';
+}
+
+function irPara(a) {
+  aba = a; renderCartoes(); renderListas();
+  $('campo').focus({ preventScroll: true });
+}
+
 function render() {
   const temConf = !!(conf && rel);
   $('tela-carga').classList.toggle('oculto', temConf);
   $('sem-cadastro').classList.toggle('oculto', temCadastro());
   $('tela-conf').classList.toggle('oculto', !temConf);
-  if (temConf) { renderResumo(); renderBipadas(); renderParadas(); }
+  $('hist-fora').classList.toggle('oculto', temConf);
+  const bloco = $('hist-bloco'), destino = temConf ? $('aba-historico') : $('hist-fora').querySelector('.env');
+  if (bloco.parentNode !== destino) destino.appendChild(bloco);
+  if (temConf) {
+    if (confMostrada !== conf.id) {
+      confMostrada = conf.id; aba = melhorAba(); busca = ''; $('busca').value = ''; barrasAbertas.clear();
+    }
+    renderResumo(); renderAvisoVelho(); renderCartoes(); renderListas(); pintarLoteNovo(); verificarLotes();
+  } else confMostrada = null;
   renderHistorico();
-  if (temConf) setTimeout(() => $('campo').focus(), 30);
+  if (temConf) setTimeout(() => $('campo').focus({ preventScroll: true }), 30);
 }
 
 function renderResumo() {
   const t = conf.totais || {};
   const notaMes = { 'mes-anterior': 'mês anterior, deduzido', 'manual': 'mês trocado por você' }[conf.deduzido];
-  const avisoMes = notaMes ? ` <span style="color:var(--espera)">(${notaMes})</span>` : '';
+  const avisoMes = notaMes ? ` <span class="nota-mes">(${notaMes})</span>` : '';
   $('resumo').innerHTML = `
     <div>
-      <div class="periodo">Relatório de ${esc(periodoTexto(conf))}${avisoMes}</div>
+      <div class="periodo"><span>Relatório de ${esc(periodoTexto(conf))}${avisoMes}</span>
+        <span class="sit ${conf.status}">${conf.status === 'concluida' ? 'Concluída' : 'Em espera'}</span></div>
       <div class="num"><b>${num((conf.bipadas||[]).filter(b=>b.produto).length)}</b> de
         <b>${num(t.apontamentos||0)}</b> apontamentos bipados,
         <b>${num(t.transferencias||0)}</b> transferências,
@@ -1926,35 +2128,315 @@ function renderResumo() {
   $('bt-outro').onclick = () => { conf = null; rel = null; render(); };
 }
 
+/* Com o atraso contado até hoje, um relatório velho faz parecer que nada foi transferido. */
+function renderAvisoVelho() {
+  const e = (rel && rel.emissao) || conf.emissao, cx = $('aviso-velho');
+  const dias = e ? ordDeHoje() - ordDoDia(e.ano, e.mes, e.dia) : 0;
+  cx.classList.toggle('oculto', dias < 1);
+  if (dias < 1) return;
+  const quando = dias === 1 ? 'ontem' : dias === 2 ? 'anteontem' : `${dias} dias atrás`;
+  cx.innerHTML = `<b>Este relatório é de ${quando}</b> (emitido em ${dd(e.dia)}/${dd(e.mes)}). ` +
+    'O que foi transferido depois disso ainda aparece como parado. Puxe um relatório novo no ERP para atualizar.';
+}
+
+function renderCartoes() {
+  const n = contagens();
+  const pct = n.total ? Math.min(100, Math.round(n.bip / n.total * 100)) : 0;
+  const s = (q, um, varios) => q === 1 ? um : varios;
+  const c = (id, rotulo, valor, sub, tom) => `<button class="cartao ${tom}${aba === id ? ' ativo' : ''}" data-aba="${id}">
+      <span class="rot">${rotulo}</span><span class="val">${valor}</span><span class="sub">${sub}</span></button>`;
+  $('cartoes').innerHTML =
+    c('bipadas', 'Bipadas', `${num(n.bip)}<small> de ${num(n.total)}</small>`,
+      `<span class="barra" title="${pct}%"><i style="width:${pct}%"></i></span>`, '') +
+    c('problemas', 'Problemas', num(n.prob), n.prob ? s(n.prob, 'precisa de você', 'precisam de você') : 'nenhum',
+      n.prob ? 'erro' : 'ok') +
+    c('paradas', 'Transferências paradas', num(n.pend),
+      n.atrasadas ? `${num(n.atrasadas)} ${s(n.atrasadas, 'atrasada', 'atrasadas')}` : n.pend ? 'dentro do prazo' : 'nenhuma',
+      n.atrasadas ? 'erro' : n.pend ? 'espera' : 'ok') +
+    c('faltam', 'Não bipadas', num(n.faltam), n.faltam ? 'apontadas, sem etiqueta lida' : 'tudo bipado', n.faltam ? '' : 'ok');
+  $('cartoes').querySelectorAll('[data-aba]').forEach(b => b.onclick = () => irPara(b.dataset.aba));
+  $('n-problemas').textContent = n.prob; $('n-problemas').classList.toggle('erro', n.prob > 0);
+  $('n-paradas').textContent = n.pend; $('n-paradas').classList.toggle('erro', n.atrasadas > 0);
+  $('n-faltam').textContent = n.faltam;
+  $('conta-bip').textContent = n.lidas;
+}
+
 /* Por que a etiqueta ficou amarela ou vermelha, para não depender de lembrar da hora da bipagem. */
 function motivoDe(b) {
-  if (b.resolvida) return '';
+  if (b.resolvida) return b.obs ? `<div class="motivo">Resolvida por você: ${esc(b.obs)}</div>` : '';
   if (!(b.nivel === 'erro' || (b.nivel === 'atencao' && b.titulo !== 'Aguardando transferência'))) return '';
   const t = [b.nivel === 'erro' ? b.detalhe : '', b.aviso].filter(Boolean).join(' ') || b.detalhe || '';
   return t ? `<div class="motivo ${b.nivel}">${esc(t)}</div>` : '';
 }
 
-function renderBipadas() {
-  const l = conf.bipadas || [];
-  $('conta-bip').textContent = l.length;
-  $('nada-bip').style.display = l.length ? 'none' : '';
-  $('lista-bip').innerHTML = l.slice(0, 60).map((b, i) => `
-    <li>
+function itemBipada(b, i, total) {
+  return `<li>
       <span class="marca ${b.resolvida ? 'ok' : b.nivel}"></span>
-      <span class="pos">${l.length - i}</span>
+      <span class="pos">${total - i}</span>
       <span class="cod">${esc(b.doc || b.cod)}</span>
       <span class="nm">${esc(b.nome || '—')}</span>
-      <span class="vd">${esc(b.resolvida ? 'resolvida' : b.titulo)}${
-        !b.resolvida && b.bloqueia !== false &&
-        (b.nivel === 'erro' || (b.nivel === 'atencao' && b.titulo !== 'Aguardando transferência'))
+      <span class="vd">${esc(b.resolvida ? 'resolvida' : b.titulo)}${precisaAcao(b)
           ? (b.sugerePacote ? ` <button class="btn btn-min" data-pacote="${i}">É caixa de ${num(b.sugerePacote)}</button>` : '') +
             ` <button class="btn btn-min" data-bip="${i}">Resolver</button>` : ''}</span>${motivoDe(b)}
-    </li>`).join('');
-  $('lista-bip').querySelectorAll('[data-bip]').forEach(b =>
-    b.onclick = () => resolverBipada(+b.dataset.bip));
-  $('lista-bip').querySelectorAll('[data-pacote]').forEach(b =>
-    b.onclick = () => confirmarPacote(+b.dataset.pacote));
+    </li>`;
 }
+
+/* Código da etiqueta remontado pelo relatório: OP(6) + produto(7) + documento(5) + quantidade(4).
+   Só devolve quando o código, lido de volta, dá exatamente o mesmo apontamento. */
+function codigoDaEtiqueta(p) {
+  if (!p || !/^\d{6}$/.test(p.op || '') || !/^\d{7}$/.test(p.produto || '') || !/^\d{6}$/.test(p.doc || '') ||
+      !Number.isInteger(p.qtd) || p.qtd < 0) return null;
+  const cod = p.op + p.produto + p.doc.slice(-5) + String(p.qtd).padStart(4, '0');
+  const e = lerEtiqueta(cod);
+  return e.ok && e.op === p.op && e.produto === p.produto && e.doc === p.doc && e.qtd === p.qtd ? cod : null;
+}
+
+async function copiar(texto, botao) {
+  let ok = false;
+  try { await navigator.clipboard.writeText(texto); ok = true; }
+  catch (e) {
+    const a = document.createElement('textarea');
+    a.value = texto; a.style.position = 'fixed'; a.style.opacity = '0';
+    document.body.appendChild(a); a.select();
+    try { ok = document.execCommand('copy'); } catch (e2) {}
+    a.remove();
+  }
+  if (!botao) return ok;
+  const antes = botao.dataset.rotulo || botao.textContent;
+  botao.dataset.rotulo = antes;
+  botao.textContent = ok ? 'Copiado' : 'Não consegui copiar';
+  clearTimeout(botao._t); botao._t = setTimeout(() => { botao.textContent = antes; }, 1600);
+  return ok;
+}
+
+/* Texto pronto para mandar a quem faz a transferência. */
+function textoCobranca() {
+  const pend = (conf.pendencias || []).filter(p => !p.tipo || p.tipo === 'sem-transferencia');
+  const atrasadas = pend.filter(p => p.idade > PRAZO_NORMAL);
+  const lista = (atrasadas.length ? atrasadas : pend).slice().sort((a, b) => b.idade - a.idade);
+  const linhas = lista.map((p, i) => {
+    const cod = codigoDaEtiqueta(p);
+    return `${i + 1}. ${p.descricao}\n` +
+      `   produto ${p.produto}${p.codigoKos ? ` (KOS ${p.codigoKos})` : ''} · doc ${p.doc} · ${num(p.qtd)} pç · ` +
+      `apontado em ${dm(p)} · há ${p.idade} ${p.idade === 1 ? 'dia' : 'dias'}` + (cod ? `\n   etiqueta ${cod}` : '');
+  });
+  return `Transferências GODKS → KOS ${atrasadas.length ? 'em atraso' : 'pendentes'} ` +
+    `(relatório de ${periodoTexto(conf)}): ${lista.length}\n\n` + linhas.join('\n');
+}
+
+function renderListas() {
+  document.querySelectorAll('#abas .aba').forEach(b => {
+    const on = b.dataset.aba === aba;
+    b.classList.toggle('ativo', on); b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  ['problemas', 'paradas', 'faltam', 'bipadas', 'historico'].forEach(a =>
+    $('aba-' + a).classList.toggle('oculto', a !== aba));
+  $('busca').classList.toggle('oculto', aba === 'historico');
+
+  const q = busca.trim().toLowerCase();
+  const casa = (...campos) => !q || campos.some(c => c != null && String(c).toLowerCase().includes(q));
+  const semResultado = `<div class="nada">Nada encontrado para "${esc(busca.trim())}".</div>`;
+
+  /* ---- bipadas ---- */
+  const l = conf.bipadas || [];
+  const vistas = l.map((b, i) => ({ b, i })).filter(x => casa(x.b.doc, x.b.cod, x.b.nome, x.b.produto, x.b.titulo));
+  $('nada-bip').style.display = l.length ? 'none' : '';
+  $('lista-bip').innerHTML = vistas.slice(0, 300).map(x => itemBipada(x.b, x.i, l.length)).join('') +
+    (l.length && !vistas.length ? `<li style="border:0">${semResultado}</li>` : '') +
+    (vistas.length > 300 ? `<li style="border:0"><div class="nada">e mais ${vistas.length - 300}. Use a busca para achar uma etiqueta.</div></li>` : '');
+
+  /* ---- problemas ---- */
+  const neg = conf.negativos || [];
+  const prob = l.map((b, i) => ({ b, i })).filter(x => precisaAcao(x.b));
+  const probVistos = prob.filter(x => casa(x.b.doc, x.b.cod, x.b.nome, x.b.produto, x.b.titulo));
+  const negVistos = neg.map((p, i) => ({ p, i })).filter(x => casa(x.p.doc, x.p.produto, x.p.descricao));
+  let hp = '';
+  if (!prob.length && !neg.length) {
+    hp = `<div class="vazio-bom"><b>Nenhum problema.</b>Etiqueta com erro ou ressalva aparece aqui para você resolver.</div>`;
+  } else {
+    if (!probVistos.length && !negVistos.length) hp += semResultado;
+    if (negVistos.length) {
+      hp += `<h3 class="sub-tit" style="margin-top:0">Estoque negativo na GODKS <span class="conta erro">${neg.length}</span></h3>` +
+        negVistos.map(x => `
+        <div class="parada grave">
+          <div class="lin1"><span class="nome">${esc(x.p.descricao)}</span></div>
+          <div class="lin2"><span>produto ${esc(x.p.produto)}</span><span>doc ${esc(x.p.doc)}</span>
+            <span>${num(x.p.qtd)} pç</span><span>dia ${dm(x.p)}</span></div>
+          <div class="lin3">Transferida para a KOS sem apontamento no período. O material saiu do estoque da GODKS sem nunca ter entrado.</div>
+          <div class="lin4"><button class="btn btn-min" data-neg="${x.i}">Já acertei</button></div>
+        </div>`).join('');
+    }
+    if (probVistos.length) {
+      hp += (negVistos.length ? `<h3 class="sub-tit">Etiquetas <span class="conta erro">${prob.length}</span></h3>` : '') +
+        `<ul class="bipadas" id="lista-prob">${probVistos.map(x => itemBipada(x.b, x.i, l.length)).join('')}</ul>`;
+    }
+  }
+  $('aba-problemas').innerHTML = hp;
+
+  /* ---- paradas ---- */
+  const pend = conf.pendencias || [], ant = conf.anteriores || [], res = conf.resolvidas || [];
+  const pendVistas = pend.map((p, i) => ({ p, i, cod: codigoDaEtiqueta(p) }))
+    .filter(x => casa(x.p.doc, x.p.produto, x.p.descricao, x.p.codigoKos, x.cod, x.p.op));
+  const nAtras = pend.filter(p => p.idade > PRAZO_NORMAL).length;
+  let ht = '';
+  if (!pend.length) {
+    ht = `<div class="vazio-bom"><b>Nenhuma transferência parada.</b>Todo apontamento KOS do período foi transferido.</div>`;
+  } else {
+    ht += `<div class="aba-cab">
+        <span class="txt">${nAtras ? `${num(nAtras)} de ${num(pend.length)} passaram do prazo de ${PRAZO_NORMAL} dias.` : `Todas dentro do prazo de ${PRAZO_NORMAL} dias.`}
+          O código da etiqueta serve para transferir no ERP.</span>
+        <button class="btn btn-min" id="bt-cobranca">${nAtras ? `Copiar cobrança (${num(nAtras)})` : 'Copiar lista'}</button>
+        <button class="btn btn-min" data-imprimir="paradas">Imprimir lista</button>
+        <button class="btn btn-min" data-imprimir="codigos">Imprimir códigos de barras</button>
+      </div>`;
+    if (!pendVistas.length) ht += semResultado;
+    ht += pendVistas.map(({ p, i, cod }) => `
+      <div class="parada ${p.idade > PRAZO_NORMAL ? 'grave' : p.idade < PRAZO_NORMAL ? 'leve' : ''}">
+        <div class="lin1">
+          <span class="nome">${esc(p.descricao)}</span>
+          <span class="idade${p.idade < PRAZO_NORMAL ? ' calma' : ''}">${p.idade} ${p.idade === 1 ? 'dia' : 'dias'}</span>
+        </div>
+        <div class="lin2">
+          <span>produto ${esc(p.produto)}</span><span>doc ${esc(p.doc)}</span>
+          <span>${num(p.qtd)} pç</span><span>dia ${dm(p)}</span>${p.codigoKos ? `<span>KOS ${esc(p.codigoKos)}</span>` : ''}
+        </div>
+        <div class="lin3">${p.tipo === 'qtd-transferencia'
+          ? `Transferida com quantidade diferente: apontado ${num(p.qtd)}, transferido ${num(p.qtdTransferida)}.`
+          : p.idade > PRAZO_NORMAL
+            ? `Passou do prazo normal de ${PRAZO_NORMAL} dias. O estoque da KOS não carregou.`
+            : p.idade === PRAZO_NORMAL
+              ? 'No limite do prazo normal. Se não sair hoje, passa a ser cobrança.'
+              : 'Dentro do prazo normal, a transferência ainda pode sair.'}</div>
+        ${cod ? `<div class="etq">
+            <span class="etq-rot">Etiqueta</span><code class="sel">${cod}</code>
+            <button class="btn btn-min" data-copiar="${cod}">Copiar código</button>
+            <button class="btn btn-min btn-claro" data-barras="${cod}">${barrasAbertas.has(cod) ? 'Ocultar código de barras' : 'Ver código de barras'}</button>
+          </div>
+          <div class="etq-barras sel${barrasAbertas.has(cod) ? '' : ' oculto'}" data-barras-de="${cod}">${barrasAbertas.has(cod) ? barras(cod) : ''}</div>` : ''}
+        <div class="lin4"><button class="btn btn-min" data-pend="${i}">Já transferi</button></div>
+      </div>`).join('');
+  }
+  if (ant.length) {
+    ht += `<h3 class="sub-tit">Apontamento em período anterior <span class="conta">${ant.length}</span></h3>` +
+      ant.filter(p => casa(p.doc, p.produto, p.descricao)).map(p => `
+      <div class="parada leve">
+        <div class="lin1"><span class="nome">${esc(p.descricao)}</span></div>
+        <div class="lin2"><span>produto ${esc(p.produto)}</span><span>doc ${esc(p.doc)}</span>
+          <span>${num(p.qtd)} pç</span><span>dia ${dm(p)}</span></div>
+        <div class="lin3">Transferida neste período, mas o apontamento ficou num relatório anterior que o app não viu. Não é erro.</div>
+      </div>`).join('');
+  }
+  if (res.length) {
+    ht += `<h3 class="sub-tit">Resolvidas <span class="conta">${res.length}</span></h3>` +
+      res.slice(-8).reverse().map(p => `
+      <div class="parada leve">
+        <div class="lin1"><span class="nome">${esc(p.descricao || p.produto)}</span></div>
+        <div class="lin2"><span>doc ${esc(p.doc)}</span><span>${num(p.qtd)} pç</span></div>
+        <div class="lin3">${p.como === 'manual'
+          ? 'Baixada por você' + (p.obs ? `: ${esc(p.obs)}` : '.')
+          : `Transferência apareceu no relatório, dia ${dd(p.resolvidaEm ? p.resolvidaEm.dia : 0)}.`}</div>
+      </div>`).join('');
+  }
+  $('aba-paradas').innerHTML = ht;
+
+  /* ---- não bipadas ---- */
+  const faltam = semEtiqueta();
+  const faltamVistas = faltam.filter(p => casa(p.doc, p.produto, p.descricao, p.op));
+  let hf = '';
+  if (!faltam.length) {
+    hf = `<div class="vazio-bom"><b>Nenhuma.</b>Toda etiqueta apontada no período passou pela sua mão.</div>`;
+  } else {
+    const n = contagens(), nJust = (conf.justificados || []).length;
+    hf += `<div class="aba-cab">
+        <span class="txt">De ${num(n.total)} apontamentos do período você bipou ${num(n.bip)}${
+          nJust ? ` e marcou ${num(nJust)} como conferido` : ''}.
+          O que sobra aqui ou ainda está na fábrica, ou chegou na expedição e passou batido. Os mais antigos vêm primeiro.</span>
+        <button class="btn btn-min" data-imprimir="faltam">Imprimir lista</button>
+      </div>`;
+    if (!faltamVistas.length) hf += semResultado;
+    hf += faltamVistas.slice(0, 100).map(p => `
+      <div class="parada ${p.ord <= (relDiaCorte()) ? 'grave' : 'leve'}">
+        <div class="lin1">
+          <span class="nome">${esc(p.descricao)}</span>
+          <span class="tipo ${p.kos ? 'kos' : 'godks'}">${p.kos ? 'KOS' : 'GODKS'}</span>
+        </div>
+        <div class="lin2"><span>produto ${esc(p.produto)}</span><span>doc ${esc(p.doc)}</span>
+          <span>${num(p.qtd)} pç</span><span>OP ${esc(p.op)}</span><span>dia ${dm(p)}</span></div>
+        <div class="lin4"><button class="btn btn-min" data-justificar="${esc(p.chave)}">Já conferi</button></div>
+      </div>`).join('');
+    if (faltamVistas.length > 100)
+      hf += `<div class="nada">e mais ${faltamVistas.length - 100}. Bipe o que tiver em mãos que a lista encurta, ou use a busca.</div>`;
+  }
+  $('aba-faltam').innerHTML = hf;
+
+  /* ---- ações ---- */
+  const area = document.querySelector('.listas');
+  area.querySelectorAll('[data-bip]').forEach(b => b.onclick = () => resolverBipada(+b.dataset.bip));
+  area.querySelectorAll('[data-pacote]').forEach(b => b.onclick = () => confirmarPacote(+b.dataset.pacote));
+  area.querySelectorAll('[data-pend]').forEach(b => b.onclick = () => resolverPendencia(+b.dataset.pend));
+  area.querySelectorAll('[data-neg]').forEach(b => b.onclick = () => ignorarNegativo(+b.dataset.neg));
+  area.querySelectorAll('[data-justificar]').forEach(b => b.onclick = () => justificar(b.dataset.justificar));
+  area.querySelectorAll('[data-imprimir]').forEach(b => b.onclick = () => imprimir(b.dataset.imprimir));
+  area.querySelectorAll('[data-copiar]').forEach(b => b.onclick = () => copiar(b.dataset.copiar, b));
+  area.querySelectorAll('[data-barras]').forEach(b => b.onclick = () => {
+    const cod = b.dataset.barras, cx = area.querySelector(`[data-barras-de="${cod}"]`);
+    const abrir = !barrasAbertas.has(cod);
+    if (abrir) { barrasAbertas.add(cod); cx.innerHTML = barras(cod); } else barrasAbertas.delete(cod);
+    cx.classList.toggle('oculto', !abrir);
+    b.textContent = abrir ? 'Ocultar código de barras' : 'Ver código de barras';
+  });
+  if ($('bt-cobranca')) $('bt-cobranca').onclick = () => copiar(textoCobranca(), $('bt-cobranca'));
+}
+
+/* ---------------- lote novo do celular ----------------
+   Em vez de você lembrar de buscar, o app olha o banco de tempos em tempos e
+   avisa quando há etiquetas enviadas do celular que ainda não estão nesta conferência. */
+let lotesBanco = [], ultimaVerif = 0, verificando = false;
+async function verificarLotes(forcar) {
+  if (!Conta.logado || !conf || verificando) return;
+  if (!forcar && Date.now() - ultimaVerif < 20000) return;
+  verificando = true; ultimaVerif = Date.now();
+  try {
+    lotesBanco = await Conta.api('lotes?select=id,nome,quantidade,criado_em,codigos&order=criado_em.desc&limit=10') || [];
+  } catch (e) { /* sem internet: fica com o que já tinha */ }
+  finally { verificando = false; }
+  pintarLoteNovo();
+}
+
+function lotesNovos() {
+  if (!conf || !Conta.logado) return [];
+  const tenho = new Set((conf.bipadas || []).map(b => b.cod));
+  const vistos = new Set(estado.lotesVistos || []);
+  return lotesBanco.filter(l => !vistos.has(l.id))
+    .map(l => ({ l, novas: (l.codigos || []).map(c => String(c).replace(/\D/g, '')).filter(c => c && !tenho.has(c)).length }))
+    .filter(x => x.novas > 0);
+}
+
+function pintarLoteNovo() {
+  const cx = $('lote-novo'), novos = lotesNovos();
+  cx.classList.toggle('oculto', !novos.length);
+  if (!novos.length) { cx.innerHTML = ''; return; }
+  const { l, novas } = novos[0];
+  const et = n => `${num(n)} ${n === 1 ? 'etiqueta' : 'etiquetas'}`;
+  cx.innerHTML = `<span class="ponto"></span>
+    <span class="txt"><b>Lote novo do celular:</b> ${esc(l.nome)} · ${novas === l.quantidade ? et(novas)
+      : `${et(novas)} que ainda não ${novas === 1 ? 'está' : 'estão'} aqui, de ${num(l.quantidade)}`}${
+      novos.length > 1 ? ` · e mais ${novos.length - 1} ${novos.length === 2 ? 'lote' : 'lotes'}` : ''}</span>
+    <button class="btn btn-forte btn-min" data-conferir="${esc(l.id)}">Conferir agora</button>
+    ${novos.length > 1 ? '<button class="btn btn-min" id="bt-lotes-todos">Ver todos</button>' : ''}
+    <button class="btn btn-claro btn-min" data-depois="${esc(l.id)}">Agora não</button>`;
+  cx.querySelector('[data-conferir]').onclick = () => usarRemoto(l.id);
+  cx.querySelector('[data-depois]').onclick = () => {
+    estado.lotesVistos = (estado.lotesVistos || []).concat([l.id]).slice(-200);
+    salvar(); pintarLoteNovo();
+  };
+  if ($('bt-lotes-todos')) $('bt-lotes-todos').onclick = () => {
+    $('nuvem').classList.remove('oculto'); $('lote').classList.add('oculto'); listarRemotos();
+    $('nuvem').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
+}
+setInterval(() => { if (document.visibilityState === 'visible') verificarLotes(true); }, 60000);
+window.addEventListener('focus', () => verificarLotes());
 
 /* Apontamentos do relatório que não têm etiqueta bipada: ou o material ainda
    não chegou na expedição, ou chegou e passou batido. */
@@ -1979,115 +2461,11 @@ function semEtiqueta() {
 
 async function justificar(chave) {
   const obs = await pedirTexto('Marcar como conferido',
-    'Use quando você já sabe por que essa etiqueta não apareceu: material ainda na fábrica, já expedido antes, e assim por diante.',
-    'Marcar conferido');
+    'Use quando você já sabe por que essa etiqueta não apareceu.',
+    'Marcar conferido', ['Material ainda na fábrica', 'Já expedido antes', 'Conferido sem etiqueta']);
   if (obs === null) return;
   conf.justificados = (conf.justificados || []).concat([chave]);
   salvar(); render();
-}
-
-function renderParadas() {
-  const pend = conf.pendencias || [], neg = conf.negativos || [], ant = conf.anteriores || [];
-  const res = conf.resolvidas || [];
-  let html = '';
-
-  html += `<div class="secao"><h2>Transferências paradas <span class="conta">${pend.length}</span>
-    ${pend.length || neg.length ? '<button class="btn btn-min imprime" data-imprimir="paradas">Imprimir</button>' : ''}</h2>`;
-  if (!pend.length) html += `<div class="nada">Nenhuma. Todo apontamento KOS do período foi transferido.</div>`;
-  else html += pend.map((p, i) => `
-    <div class="parada ${p.idade > 3 ? 'grave' : p.idade < 3 ? 'leve' : ''}">
-      <div class="lin1">
-        <span class="nome">${esc(p.descricao)}</span>
-        <span class="idade${p.idade < 3 ? ' calma' : ''}">${p.idade} ${p.idade === 1 ? 'dia' : 'dias'}</span>
-      </div>
-      <div class="lin2">
-        <span>produto ${esc(p.produto)}</span><span>doc ${esc(p.doc)}</span>
-        <span>${num(p.qtd)} pç</span><span>dia ${dm(p)}</span>
-      </div>
-      <div class="lin3">${p.idade > 3
-        ? 'Passou do prazo normal de 3 dias. O estoque da KOS não carregou.'
-        : p.idade === 3
-          ? 'No limite do prazo normal. Se não sair hoje, passa a ser cobrança.'
-          : 'Dentro do prazo normal, a transferência ainda pode sair.'}
-        ${p.codigoKos ? ` Na KOS é o código ${esc(p.codigoKos)}.` : ''}</div>
-      <div class="lin4"><button class="btn btn-min" data-pend="${i}">Já transferi</button></div>
-    </div>`).join('');
-  html += '</div>';
-
-  if (neg.length) {
-    html += `<div class="secao"><h2>Estoque negativo na GODKS <span class="conta">${neg.length}</span></h2>`;
-    html += neg.map((p, i) => `
-      <div class="parada grave">
-        <div class="lin1"><span class="nome">${esc(p.descricao)}</span></div>
-        <div class="lin2"><span>produto ${esc(p.produto)}</span><span>doc ${esc(p.doc)}</span>
-          <span>${num(p.qtd)} pç</span><span>dia ${dm(p)}</span></div>
-        <div class="lin3">Transferida para a KOS sem apontamento no período. O material saiu do estoque da GODKS sem nunca ter entrado.</div>
-        <div class="lin4"><button class="btn btn-min" data-neg="${i}">Já acertei</button></div>
-      </div>`).join('');
-    html += '</div>';
-  }
-
-  if (ant.length) {
-    html += `<div class="secao"><h2>Apontamento em período anterior <span class="conta">${ant.length}</span></h2>`;
-    html += ant.map(p => `
-      <div class="parada leve">
-        <div class="lin1"><span class="nome">${esc(p.descricao)}</span></div>
-        <div class="lin2"><span>produto ${esc(p.produto)}</span><span>doc ${esc(p.doc)}</span>
-          <span>${num(p.qtd)} pç</span><span>dia ${dm(p)}</span></div>
-        <div class="lin3">Transferida neste período, mas o apontamento ficou num relatório anterior que o app não viu. Não é erro.</div>
-      </div>`).join('');
-    html += '</div>';
-  }
-
-  const faltam = semEtiqueta();
-  const totalAp = (conf.totais || {}).apontamentos || 0;
-  html += `<div class="secao"><h2>Apontado e não bipado <span class="conta">${faltam.length}</span>
-    ${faltam.length ? '<button class="btn btn-min imprime" data-imprimir="faltam">Imprimir</button>' : ''}</h2>`;
-  if (!faltam.length) {
-    html += `<div class="nada">Nenhum. Toda etiqueta apontada no período passou pela sua mão.</div>`;
-  } else {
-    const nBip = (conf.bipadas || []).filter(b => b.produto).length;
-    const nJust = (conf.justificados || []).length;
-    html += `<div class="nada" style="padding-top:0">De ${num(totalAp)} apontamentos do período você bipou ${num(nBip)}${
-      nJust ? ` e marcou ${num(nJust)} como conferido` : ''}.
-      O que sobra aqui ou ainda está na fábrica, ou chegou na expedição e passou batido. Os mais antigos vêm primeiro.</div>`;
-    html += faltam.slice(0, 40).map(p => `
-      <div class="parada ${p.ord <= (relDiaCorte()) ? 'grave' : 'leve'}">
-        <div class="lin1">
-          <span class="nome">${esc(p.descricao)}</span>
-          <span class="tipo ${p.kos ? 'kos' : 'godks'}">${p.kos ? 'KOS' : 'GODKS'}</span>
-        </div>
-        <div class="lin2"><span>produto ${esc(p.produto)}</span><span>doc ${esc(p.doc)}</span>
-          <span>${num(p.qtd)} pç</span><span>OP ${esc(p.op)}</span><span>dia ${dm(p)}</span></div>
-        <div class="lin4"><button class="btn btn-min" data-justificar="${esc(p.chave)}">Já conferi</button></div>
-      </div>`).join('');
-    if (faltam.length > 40)
-      html += `<div class="nada">e mais ${faltam.length - 40}. Bipe o que tiver em mãos que a lista encurta.</div>`;
-  }
-  html += '</div>';
-
-  if (res.length) {
-    html += `<div class="secao"><h2>Resolvidas <span class="conta">${res.length}</span></h2>`;
-    html += res.slice(-8).reverse().map(p => `
-      <div class="parada leve">
-        <div class="lin1"><span class="nome">${esc(p.descricao || p.produto)}</span></div>
-        <div class="lin2"><span>doc ${esc(p.doc)}</span><span>${num(p.qtd)} pç</span></div>
-        <div class="lin3">${p.como === 'manual'
-          ? 'Baixada por você' + (p.obs ? `: ${esc(p.obs)}` : '.')
-          : `Transferência apareceu no relatório, dia ${dd(p.resolvidaEm ? p.resolvidaEm.dia : 0)}.`}</div>
-      </div>`).join('');
-    html += '</div>';
-  }
-
-  $('coluna-paradas').innerHTML = html;
-  $('coluna-paradas').querySelectorAll('[data-pend]').forEach(b =>
-    b.onclick = () => resolverPendencia(+b.dataset.pend));
-  $('coluna-paradas').querySelectorAll('[data-neg]').forEach(b =>
-    b.onclick = () => ignorarNegativo(+b.dataset.neg));
-  $('coluna-paradas').querySelectorAll('[data-justificar]').forEach(b =>
-    b.onclick = () => justificar(b.dataset.justificar));
-  $('coluna-paradas').querySelectorAll('[data-imprimir]').forEach(b =>
-    b.onclick = () => imprimir(b.dataset.imprimir));
 }
 
 /* Apontamento dos últimos dias ainda pode estar na fábrica; o que é mais
@@ -2202,7 +2580,24 @@ campo.addEventListener('input', () => {
   if (campo.value.replace(/\D/g, '').length >= 22) timer = setTimeout(enviar, 120);
 });
 document.addEventListener('click', e => {
-  if (rel && !e.target.closest('button,input,textarea,a,dialog,.lote,#nuvem')) campo.focus();
+  if (rel && !e.target.closest('button,input,textarea,a,dialog,label,.lote,#nuvem,.sel,.menu')) campo.focus({ preventScroll: true });
+});
+
+const menu = $('menu'), btMenu = $('bt-menu');
+function fecharMenu() { menu.classList.add('oculto'); btMenu.setAttribute('aria-expanded', 'false'); }
+btMenu.onclick = e => {
+  e.stopPropagation();
+  const abrir = menu.classList.contains('oculto');
+  menu.classList.toggle('oculto', !abrir); btMenu.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+};
+document.addEventListener('click', e => { if (!e.target.closest('.menu-caixa')) fecharMenu(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharMenu(); });
+menu.querySelectorAll('button').forEach(b => b.addEventListener('click', fecharMenu));
+
+document.querySelectorAll('#abas .aba').forEach(b => b.onclick = () => irPara(b.dataset.aba));
+$('busca').addEventListener('input', () => { busca = $('busca').value; renderListas(); });
+$('busca').addEventListener('keydown', e => {
+  if (e.key === 'Escape') { $('busca').value = ''; busca = ''; renderListas(); campo.focus({ preventScroll: true }); }
 });
 
 $('bt-entrar-carga').onclick = () => abrirEntrar();
@@ -2241,7 +2636,7 @@ $('form-nova').onsubmit = async ev => {
   } catch (err) { $('nova-erro').textContent = err.message; }
   finally { $('bt-nova').disabled = false; }
 };
-Conta.aoSair(() => { pintarConta(); pintarNuvem(); if (!$('nuvem').classList.contains('oculto')) listarRemotos(); });
+Conta.aoSair(() => { pintarConta(); pintarNuvem(); pintarLoteNovo(); if (!$('nuvem').classList.contains('oculto')) listarRemotos(); });
 
 render();
 pintarConta();
