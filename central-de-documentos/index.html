@@ -484,7 +484,33 @@
   #portao .pt-previa img{max-width:100%; height:64px; object-fit:contain; display:block; margin:0 auto 6px auto;}
   .pt-conta{margin-left:auto; display:flex; align-items:center; gap:8px; color:#94a3b8; font-size:12.5px;}
   .pt-conta .btn{padding:7px 12px;}
-  @media print{ #portao, .pt-conta{display:none !important;} }
+  input.manual-field.auto-filled{ background:var(--auto); border-bottom:1px solid var(--auto-border); }
+
+  /* ---- condições de pagamento: escolher o código e o painel ---- */
+  .cond-overlay{display:none; position:fixed; inset:0; z-index:98; background:rgba(5,7,12,.72); backdrop-filter:blur(4px);
+          align-items:center; justify-content:center; padding:20px; font-family:"Segoe UI", system-ui, -apple-system, Arial, sans-serif;}
+  .cond-overlay.aberto{display:flex;}
+  .cond-overlay .cond-card{max-width:500px; max-height:92vh; overflow:auto;}
+  .cond-overlay .cond-card.larga{max-width:660px;}
+  .cond-grade{display:grid; grid-template-columns:repeat(auto-fill,minmax(80px,1fr)); gap:8px; margin:0 0 14px 0;}
+  .cond-grade .btn.cond-cod{justify-content:center; font-family:ui-monospace,"Cascadia Mono",Consolas,monospace; font-size:14px; padding:10px 4px;}
+  .cond-check{display:flex; gap:8px; align-items:center; color:#cbd5e1; font-size:12.5px; margin:0 0 16px 0;}
+  .cond-check input{width:auto; height:auto; margin:0;}
+  .cond-abas{display:flex; gap:8px; align-items:center; margin:0 0 12px 0; flex-wrap:wrap;}
+  .cond-card input.cond-campo[type=text]{flex:1 1 150px; min-width:0; padding:9px 11px; border-radius:10px; border:1px solid rgba(255,255,255,.16);
+          background:rgba(0,0,0,.28); color:#fff; font-family:inherit; font-size:13.5px; height:auto; width:auto;}
+  .cond-lista{max-height:44vh; overflow:auto; border:1px solid rgba(255,255,255,.12); border-radius:10px; margin:0 0 12px 0;}
+  .cond-linha{display:flex; gap:12px; align-items:center; padding:6px 12px; border-bottom:1px solid rgba(255,255,255,.07); color:#e2e8f0; font-size:13px;}
+  .cond-linha:last-child{border-bottom:0;}
+  .cond-linha .cond-c{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace; width:52px; flex:none; color:#fff;}
+  .cond-linha .cond-p{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .cond-linha .cond-a{display:flex; gap:8px; align-items:center; flex:none; color:#94a3b8; font-size:12px;}
+  .cond-linha .cond-a em{font-style:normal; color:#6ee7b7; background:rgba(110,231,183,.12); border-radius:99px; padding:1px 9px; font-weight:600;}
+  .cond-linha .cond-a .btn{padding:5px 10px; font-size:12px;}
+  .cond-vazio{padding:16px; color:#94a3b8; font-size:13px; text-align:center;}
+  .cond-msg{min-height:18px; margin:0 0 12px 0; font-size:12.5px; color:#6ee7b7; line-height:1.4;}
+  .cond-msg.erro{color:#fca5a5;}
+  @media print{ #portao, .pt-conta, .cond-overlay{display:none !important;} }
 </style>
 
 <div id="portao">
@@ -536,11 +562,12 @@
 
 <div class="app-bar">
   <div>
-    <h2 class="app-title">Central de Documentos <span style="font-size:.6em;font-weight:400;opacity:.65">v3</span></h2>
+    <h2 class="app-title">Central de Documentos <span style="font-size:.6em;font-weight:400;opacity:.65">v4</span></h2>
     <p class="app-sub" id="app-sub">Liberação de Pedidos &middot; KOS / GODKS</p>
   </div>
   <div class="pt-conta">
     <span id="pt-email"></span>
+    <button class="btn" id="pt-condicoes" title="Condições de pagamento: códigos e prazos">Condições</button>
     <button class="btn" id="pt-logos" title="Trocar as logos e os nomes das empresas">Logos</button>
     <button class="btn" id="pt-sair">Sair</button>
   </div>
@@ -1434,7 +1461,9 @@ async function extractFromCotacao(){
       aviso = ' Não identifiquei a empresa no cabeçalho: confira se o formulário certo é KOS ou GODKS.';
     }
 
-    setStatus('Pronto!' + aviso + ' Confira os verdes e complete os amarelos.', 'ok');
+    let extraCond = '';
+    try { extraCond = await Condicoes.aplicar(d.empresa, d.cond_pagamento); } catch(e){ console.error(e); }
+    setStatus('Pronto!' + aviso + extraCond + ' Confira os verdes e complete os amarelos.', 'ok');
   }catch(err){
     console.error(err);
     setStatus('Não consegui ler o PDF. Preencha manualmente. (' + err.message + ')', 'err');
@@ -1443,6 +1472,33 @@ async function extractFromCotacao(){
   }
 }
 </script>
+<div id="cond-pick" class="cond-overlay" role="dialog" aria-modal="true" aria-labelledby="cond-pick-titulo">
+  <div class="modal-card cond-card">
+    <h3 id="cond-pick-titulo"></h3>
+    <p class="modal-sub" id="cond-pick-sub"></p>
+    <div class="cond-grade" id="cond-pick-grade"></div>
+    <label class="cond-check"><input type="checkbox" id="cond-pick-padrao" checked><span id="cond-pick-padrao-txt"></span></label>
+    <div class="modal-acoes"><button type="button" class="btn" id="cond-pick-depois">Escolher depois</button></div>
+  </div>
+</div>
+<div id="cond-painel" class="cond-overlay" role="dialog" aria-modal="true" aria-labelledby="cond-titulo">
+  <div class="modal-card cond-card larga">
+    <h3 id="cond-titulo">Condições de pagamento</h3>
+    <p class="modal-sub" id="cond-sub"></p>
+    <div class="cond-abas">
+      <button type="button" class="btn" data-emp="kos">KOS</button>
+      <button type="button" class="btn" data-emp="godks">GODKS</button>
+      <input class="cond-campo" id="cond-busca" type="text" autocomplete="off" placeholder="buscar código ou prazo" aria-label="Buscar condição">
+    </div>
+    <div class="cond-lista" id="cond-lista"></div>
+    <div class="cond-msg" id="cond-msg" role="status"></div>
+    <div class="modal-acoes">
+      <input type="file" id="cond-pdf" accept=".pdf,application/pdf" style="display:none" aria-label="PDF da lista de condições de pagamento">
+      <button type="button" class="btn" id="cond-atualizar" title="Solte o PDF da lista de condições de pagamento do ERP">Atualizar pelo PDF do ERP</button>
+      <button type="button" class="btn primary" id="cond-fechar">Fechar</button>
+    </div>
+  </div>
+</div>
 <script>
 /* ---------- conta e banco (Supabase, projeto conferencia-etiquetas) ----------
    A chave abaixo é a "publishable": foi feita para ficar à vista no código.
@@ -1607,6 +1663,296 @@ const Conta = (() => {
 })();
 </script>
 <script>
+/* ---------- condições de pagamento: núcleo (sem DOM, testável no Node) ----------
+   A cotação escreve a condição como "30 DIAS" (um prazo) ou "30/60/90" (vários), e às vezes
+   "A VISTA". A lista do ERP (FAT020) traz código + prazo ("30", "30/60/90", "A VISTA").
+   O mesmo código vale coisas diferentes em cada empresa, então tudo é separado por empresa. */
+
+/* Chave de comparação: "30 DIAS" -> "30"; "07/14/21" -> "7/14/21"; "a  vista" -> "A VISTA". */
+function chavePrazo(texto) {
+  const t = String(texto == null ? '' : texto).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ').trim();
+  const m = t.match(/^([\d\s\/]+?)\s*(?:DIAS?)?$/);
+  if (m && /\d/.test(m[1])) {
+    const partes = m[1].split('/').map(p => p.replace(/\s+/g, '')).filter(p => p !== '');
+    if (partes.length && partes.every(p => /^\d+$/.test(p))) return partes.map(p => String(parseInt(p, 10))).join('/');
+  }
+  return t;
+}
+
+/* Linhas do PDF "CONDICAO DE PAGAMENTO" (FAT020) -> { empresa, itens: [{ codigo, prazo, chave }] }.
+   empresa e itens vêm nulos/vazios quando o PDF não é essa lista. */
+function lerListaCondicoes(linhas) {
+  const topo = linhas.slice(0, 12);
+  /* o leitor de PDF devolve o título com as letras separadas ("C O N D I C A O ..."): comparo sem espaços */
+  const ehLista = topo.some(l => l.replace(/\s+/g, '').toUpperCase().includes('CONDICAODEPAGAMENTO')) && linhas.some(l => /\bCOD\b.*\bDESCRITIVO\b/i.test(l));
+  let empresa = null;
+  for (const l of topo) { const m = l.match(/\b01\s+(KOS|GODKS)\b/i); if (m) { empresa = m[1].toLowerCase(); break; } }
+  const itens = [], vistos = new Map();
+  if (ehLista) for (const l of linhas) {
+    const m = l.match(/^\s*(\d{3,5})\s+(\d+|T)\s+(\d+)\s+(\S+)\s+(\S+)\s+(.+?)\s*$/);
+    if (!m) continue;
+    const prazo = m[6].trim(); if (!prazo || prazo.length > 60) continue;
+    const item = { codigo: m[1], prazo, chave: chavePrazo(prazo) };
+    if (vistos.has(item.codigo)) itens[vistos.get(item.codigo)] = item; else { vistos.set(item.codigo, itens.length); itens.push(item); }
+  }
+  return { ehLista, empresa, itens };
+}
+
+function distanciaEdicao(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+
+/* Procura a condição lida da cotação na lista da empresa.
+   tipo: 'unico' | 'padrao' | 'varios' | 'aproximado' | 'nenhum' | 'sem-lista' | 'vazio'.
+   Só texto (A VISTA, AMOSTRA...) aceita uma letra de diferença; prazo numérico tem que ser exato,
+   porque um número errado poria o código errado sem ninguém perceber. */
+function resolverCondicao(lista, empresa, texto) {
+  const chave = chavePrazo(texto);
+  if (!chave) return { tipo: 'vazio', chave };
+  const da = (lista || []).filter(c => c.empresa === empresa);
+  if (!da.length) return { tipo: 'sem-lista', chave };
+  const iguais = da.filter(c => c.chave === chave);
+  if (iguais.length === 1) return { tipo: 'unico', chave, codigo: iguais[0].codigo, prazo: iguais[0].prazo, opcoes: iguais };
+  if (iguais.length > 1) {
+    const pad = iguais.filter(c => c.padrao);
+    return pad.length === 1 ? { tipo: 'padrao', chave, codigo: pad[0].codigo, prazo: pad[0].prazo, opcoes: iguais } : { tipo: 'varios', chave, opcoes: iguais };
+  }
+  if (!/\d/.test(chave) && chave.length >= 5) {
+    const perto = da.filter(c => !/\d/.test(c.chave) && distanciaEdicao(c.chave, chave) <= 1);
+    const chaves = [...new Set(perto.map(c => c.chave))];
+    if (chaves.length === 1) {
+      const rows = perto.filter(c => c.chave === chaves[0]);
+      if (rows.length === 1) return { tipo: 'aproximado', chave, codigo: rows[0].codigo, prazo: rows[0].prazo, lido: String(texto).trim(), opcoes: rows };
+      const pad = rows.filter(c => c.padrao);
+      return pad.length === 1 ? { tipo: 'aproximado', chave, codigo: pad[0].codigo, prazo: pad[0].prazo, lido: String(texto).trim(), opcoes: rows } : { tipo: 'varios', chave, aproximado: true, lido: String(texto).trim(), opcoes: rows };
+    }
+  }
+  return { tipo: 'nenhum', chave };
+}
+
+/* Diferença entre o que está no banco e a lista nova do PDF, para mostrar antes de gravar. */
+function compararListas(noBanco, novos) {
+  const antes = new Map(noBanco.map(c => [c.codigo, c])), agora = new Map(novos.map(c => [c.codigo, c]));
+  return {
+    novos: novos.filter(c => !antes.has(c.codigo)),
+    alterados: novos.filter(c => antes.has(c.codigo) && antes.get(c.codigo).chave !== c.chave),
+    textoAlterado: novos.filter(c => antes.has(c.codigo) && antes.get(c.codigo).chave === c.chave && antes.get(c.codigo).prazo !== c.prazo),
+    sumidos: noBanco.filter(c => !agora.has(c.codigo))
+  };
+}
+
+if (typeof module !== 'undefined') module.exports = { chavePrazo, lerListaCondicoes, distanciaEdicao, resolverCondicao, compararListas };
+
+/* ---------- condições de pagamento na Central: tela e banco ----------
+   A lista (código + prazo, por empresa) vem do banco depois do login e fica só na memória desta aba.
+   Procurar a condição de uma cotação é feito aqui, no computador: nada da cotação é enviado.
+   O que vai para o banco é só a própria lista (código e prazo) e o código padrão que você escolhe. */
+const Condicoes = (function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const NOME = { kos: 'KOS', godks: 'GODKS' };
+  let lista = null;             // null: não carregou; []: carregou e está vazia
+  let pronta = Promise.resolve();
+  let geracao = 0;
+  let painelEmp = 'kos', busca = '';
+
+  /* ---- carregar ---- */
+  function carregar() {
+    const minha = ++geracao;
+    pronta = Conta.todos('condicoes_pagamento?select=empresa,codigo,prazo,chave,padrao&order=empresa,codigo')
+      .then(r => {
+        if (minha !== geracao) return;
+        lista = (r || []).filter(c => NOME[c.empresa] && /^\d{3,5}$/.test(String(c.codigo)) && c.prazo && c.chave)
+          .map(c => ({ empresa: c.empresa, codigo: String(c.codigo), prazo: String(c.prazo), chave: String(c.chave), padrao: !!c.padrao }));
+      })
+      .catch(() => { if (minha === geracao) lista = null; });
+    return pronta;
+  }
+  function limpar() {
+    geracao++; lista = null; pronta = Promise.resolve();
+    $('cond-pick').classList.remove('aberto'); $('cond-painel').classList.remove('aberto');
+  }
+
+  const preencher = codigo => setAuto('cond_pagamento_codigo', codigo);
+  const q = (campo, valor) => campo + '=eq.' + encodeURIComponent(valor);
+
+  /* ---- código padrão de um prazo (um por empresa e prazo) ---- */
+  async function definirPadrao(empresa, chave, codigo) {
+    const cab = { Prefer: 'return=minimal' };
+    await Conta.api(`condicoes_pagamento?${q('empresa', empresa)}&${q('chave', chave)}`, { method: 'PATCH', headers: cab, body: JSON.stringify({ padrao: false }) });
+    if (codigo) await Conta.api(`condicoes_pagamento?${q('empresa', empresa)}&${q('codigo', codigo)}`, { method: 'PATCH', headers: cab, body: JSON.stringify({ padrao: true }) });
+    for (const c of lista) if (c.empresa === empresa && c.chave === chave) c.padrao = c.codigo === codigo;
+  }
+
+  /* ---- escolher entre vários códigos ---- */
+  function escolher(empresa, r) {
+    return new Promise(resolve => {
+      const ov = $('cond-pick'), grade = $('cond-pick-grade'), prazo = r.opcoes[0].prazo;
+      $('cond-pick-titulo').textContent = `Qual código? Há ${r.opcoes.length} para ${prazo}`;
+      $('cond-pick-sub').textContent = `Na ${NOME[empresa]}, o prazo ${prazo} tem mais de um código no ERP` +
+        (r.lido && r.aproximado ? ` (li "${r.lido}")` : '') + '. Escolha o que vale para esta cotação.';
+      $('cond-pick-padrao-txt').textContent = `Usar sempre este para ${prazo} na ${NOME[empresa]} (vira o padrão)`;
+      $('cond-pick-padrao').checked = true;
+      grade.textContent = '';
+      let fechado = false;
+      const fim = async codigo => {
+        if (fechado) return; fechado = true;
+        ov.classList.remove('aberto'); document.removeEventListener('keydown', tecla, true);
+        let erroPadrao = null;
+        if (codigo && $('cond-pick-padrao').checked) { try { await definirPadrao(empresa, r.chave, codigo); } catch (e) { erroPadrao = e.message; } }
+        resolve({ codigo, erroPadrao });
+      };
+      const tecla = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); fim(null); } };
+      for (const c of r.opcoes) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn cond-cod'; b.textContent = c.codigo;
+        b.onclick = () => fim(c.codigo); grade.appendChild(b);
+      }
+      $('cond-pick-depois').onclick = () => fim(null);
+      document.addEventListener('keydown', tecla, true);
+      ov.classList.add('aberto'); grade.firstChild.focus();
+    });
+  }
+
+  /* ---- usado ao extrair a cotação: devolve o texto que entra no aviso da tela ---- */
+  async function aplicar(empresa, texto) {
+    texto = String(texto || '').trim();
+    if (!texto) return '';
+    await pronta;
+    if (!empresa) return ' Sem a empresa não dá para achar o código da condição de pagamento: preencha à mão.';
+    if (lista === null) return ' Não consegui carregar a lista de condições de pagamento: preencha o código à mão.';
+    const nome = NOME[empresa], r = resolverCondicao(lista, empresa, texto);
+    switch (r.tipo) {
+      case 'unico': preencher(r.codigo); return ` Condição ${texto}: código ${r.codigo}.`;
+      case 'padrao': preencher(r.codigo); return ` Condição ${texto}: código ${r.codigo}, o seu padrão (há ${r.opcoes.length} códigos para esse prazo na ${nome}).`;
+      case 'aproximado': preencher(r.codigo); return ` Li "${r.lido}" como "${r.prazo}", código ${r.codigo}. Confira.`;
+      case 'varios': {
+        const esc = await escolher(empresa, r);
+        if (!esc.codigo) return ` A condição ${texto} tem ${r.opcoes.length} códigos na ${nome}: escolha o código à mão.`;
+        preencher(esc.codigo);
+        return ` Condição ${texto}: código ${esc.codigo}.` + (esc.erroPadrao ? ` Não consegui guardar como padrão (${esc.erroPadrao}).` : '');
+      }
+      case 'nenhum': return ` Não achei a condição "${texto}" na lista da ${nome}: preencha o código à mão.`;
+      case 'sem-lista': return ` A lista de condições da ${nome} está vazia no banco. Use o botão Condições para carregar.`;
+      default: return '';
+    }
+  }
+
+  /* ---- painel ---- */
+  function ordem(a, b) {
+    const num = c => /\d/.test(c.chave) ? c.chave.split('/').map(Number) : null;
+    const x = num(a), y = num(b);
+    if (!x !== !y) return x ? -1 : 1;
+    if (x) { for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] ?? -1) !== (y[i] ?? -1)) return (x[i] ?? -1) - (y[i] ?? -1); } }
+    else if (a.chave !== b.chave) return a.chave < b.chave ? -1 : 1;
+    return a.codigo < b.codigo ? -1 : a.codigo > b.codigo ? 1 : 0;
+  }
+  const msg = (t, erro) => { const m = $('cond-msg'); m.textContent = t || ''; m.className = 'cond-msg' + (erro ? ' erro' : ''); };
+
+  function renderPainel() {
+    document.querySelectorAll('#cond-painel [data-emp]').forEach(b => b.classList.toggle('primary', b.dataset.emp === painelEmp));
+    const alvo = $('cond-lista'); alvo.textContent = '';
+    if (lista === null) { $('cond-sub').textContent = 'Não consegui carregar a lista. Feche e abra de novo, ou entre outra vez.'; return; }
+    const da = lista.filter(c => c.empresa === painelEmp), cont = new Map();
+    for (const c of da) cont.set(c.chave, (cont.get(c.chave) || 0) + 1);
+    const varios = [...cont.values()].filter(n => n > 1).length, padroes = da.filter(c => c.padrao).length;
+    $('cond-sub').textContent = da.length
+      ? `${da.length} condições na ${NOME[painelEmp]}. ${varios} prazos têm mais de um código; ${padroes} já têm padrão.`
+      : `Nenhuma condição da ${NOME[painelEmp]} no banco. Use "Atualizar pelo PDF do ERP".`;
+    const t = busca.trim().toLowerCase();
+    const vistas = da.filter(c => !t || c.codigo.includes(t) || c.prazo.toLowerCase().includes(t)).sort(ordem);
+    for (const c of vistas) {
+      const linha = document.createElement('div'); linha.className = 'cond-linha';
+      const cod = document.createElement('span'); cod.className = 'cond-c'; cod.textContent = c.codigo;
+      const pz = document.createElement('span'); pz.className = 'cond-p'; pz.textContent = c.prazo;
+      const ac = document.createElement('span'); ac.className = 'cond-a';
+      if (cont.get(c.chave) > 1) {
+        if (c.padrao) { const tag = document.createElement('em'); tag.textContent = 'padrão'; ac.appendChild(tag); }
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn';
+        b.textContent = c.padrao ? 'Tirar padrão' : 'Usar como padrão';
+        b.onclick = async () => {
+          b.disabled = true;
+          const eraPadrao = c.padrao;     // definirPadrao muda c.padrao, então guardo antes
+          try { await definirPadrao(c.empresa, c.chave, eraPadrao ? null : c.codigo); msg(eraPadrao ? `Sem padrão para ${c.prazo}.` : `Código ${c.codigo} é o padrão de ${c.prazo} na ${NOME[c.empresa]}.`); }
+          catch (e) { msg('Não consegui salvar: ' + e.message, true); }
+          renderPainel();
+        };
+        ac.appendChild(b);
+      } else { const u = document.createElement('small'); u.textContent = 'único'; ac.appendChild(u); }
+      linha.append(cod, pz, ac); alvo.appendChild(linha);
+    }
+    if (!vistas.length && da.length) { const v = document.createElement('div'); v.className = 'cond-vazio'; v.textContent = 'Nada encontrado.'; alvo.appendChild(v); }
+  }
+
+  function abrirPainel() {
+    if (!Conta.logado) return;
+    msg(''); busca = ''; $('cond-busca').value = ''; painelEmp = typeof empresaAtual === 'string' && NOME[empresaAtual] ? empresaAtual : 'kos';
+    $('cond-painel').classList.add('aberto'); renderPainel(); $('cond-busca').focus();
+    carregar().then(renderPainel);
+  }
+  const fecharPainel = () => $('cond-painel').classList.remove('aberto');
+
+  /* ---- atualizar pelo PDF do ERP (relatório FAT020 "CONDICAO DE PAGAMENTO") ---- */
+  async function linhasDoPdf(file) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = getWorkerUrl();
+    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    let texto = '';
+    for (let i = 1; i <= pdf.numPages; i++) { const p = await pdf.getPage(i); texto += itemsParaTexto((await p.getTextContent()).items) + '\n'; }
+    return texto.split('\n');
+  }
+
+  async function atualizarPdf(file) {
+    const botao = $('cond-atualizar'); botao.disabled = true; msg('Lendo o PDF...');
+    try {
+      let linhas;
+      try { linhas = await linhasDoPdf(file); } catch (e) { msg('Não consegui ler esse PDF: ' + e.message, true); return; }
+      const r = lerListaCondicoes(linhas);
+      if (!r.ehLista) { msg('Esse PDF não parece a lista de condições de pagamento do ERP (relatório "CONDICAO DE PAGAMENTO"). Nada foi alterado.', true); return; }
+      if (!r.empresa) { msg('Não achei a empresa (KOS ou GODKS) no cabeçalho do PDF. Nada foi alterado.', true); return; }
+      if (r.itens.length < 20) { msg(`Encontrei só ${r.itens.length} condições. O PDF parece incompleto. Nada foi alterado.`, true); return; }
+      await carregar(); if (lista === null) { msg('Não consegui ler a lista que está no banco. Nada foi alterado.', true); return; }
+      const nome = NOME[r.empresa], noBanco = lista.filter(c => c.empresa === r.empresa), d = compararListas(noBanco, r.itens);
+      const mudou = d.novos.length + d.alterados.length + d.textoAlterado.length + d.sumidos.length;
+      painelEmp = r.empresa; renderPainel();
+      if (!mudou) { msg(`Nada mudou: as ${r.itens.length} condições da ${nome} que estão no PDF já estão no banco.`); return; }
+      const resumo = `${nome}: ${r.itens.length} condições no PDF e ${noBanco.length} no banco.\nNovas: ${d.novos.length}. Com prazo alterado: ${d.alterados.length + d.textoAlterado.length}. Que saem da lista: ${d.sumidos.length}.`;
+      if (d.sumidos.length > Math.max(5, noBanco.length * 0.2) &&
+          !confirm(resumo + `\n\nAtenção: o PDF não traz ${d.sumidos.length} condições que estão no banco. Ele pode estar incompleto. Continuar mesmo assim?`)) { msg('Nada foi alterado.'); return; }
+      if (!confirm(resumo + '\n\nGravar no banco?')) { msg('Nada foi alterado.'); return; }
+      msg('Gravando...');
+      const agora = new Date().toISOString(), cab = { Prefer: 'resolution=merge-duplicates,return=minimal' };
+      const linha = c => ({ empresa: r.empresa, codigo: c.codigo, prazo: c.prazo, chave: c.chave, atualizado_em: agora });
+      const grupoA = [...d.novos, ...d.textoAlterado].map(linha);
+      const grupoB = d.alterados.map(c => Object.assign(linha(c), { padrao: false }));   // prazo mudou: o padrão antigo não vale mais
+      for (const grupo of [grupoB, grupoA]) for (let i = 0; i < grupo.length; i += 200)
+        await Conta.api('condicoes_pagamento', { method: 'POST', headers: cab, body: JSON.stringify(grupo.slice(i, i + 200)) });
+      for (let i = 0; i < d.sumidos.length; i += 100)
+        await Conta.api(`condicoes_pagamento?${q('empresa', r.empresa)}&codigo=in.(${d.sumidos.slice(i, i + 100).map(c => encodeURIComponent(c.codigo)).join(',')})`, { method: 'DELETE' });
+      await carregar(); renderPainel();
+      msg(`Pronto. ${nome}: ${d.novos.length} novas, ${d.alterados.length + d.textoAlterado.length} alteradas, ${d.sumidos.length} removidas.`);
+    } catch (e) {
+      msg('Não consegui gravar: ' + e.message + ' Confira a lista antes de continuar.', true); carregar().then(renderPainel);
+    } finally { botao.disabled = false; }
+  }
+
+  /* ---- ligações da tela ---- */
+  $('pt-condicoes').onclick = abrirPainel;
+  $('cond-fechar').onclick = fecharPainel;
+  $('cond-painel').addEventListener('click', e => { if (e.target === $('cond-painel')) fecharPainel(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('cond-painel').classList.contains('aberto') && !$('cond-pick').classList.contains('aberto')) fecharPainel(); });
+  document.querySelectorAll('#cond-painel [data-emp]').forEach(b => b.onclick = () => { painelEmp = b.dataset.emp; msg(''); renderPainel(); });
+  $('cond-busca').addEventListener('input', () => { busca = $('cond-busca').value; renderPainel(); });
+  $('cond-atualizar').onclick = () => $('cond-pdf').click();
+  $('cond-pdf').onchange = ev => { const f = ev.target.files[0]; ev.target.value = ''; if (f) atualizarPdf(f); };
+
+  return { carregar, limpar, aplicar, abrirPainel, get lista() { return lista; } };
+})();
+</script>
+<script>
 /* ---------- portão da Central de Documentos ----------
    A página publicada não tem as logos nem a razão social das empresas. Depois
    do login elas vêm do banco (tabela documentos_config) e ficam só na memória
@@ -1645,10 +1991,11 @@ const Conta = (() => {
     }
     switchTemplate(empresaAtual);
     el('pt-email').textContent = Conta.email || '';
+    Condicoes.carregar();      // lista de condições de pagamento (não trava a Central se falhar)
     tela(null);
   }
   function retirar() {
-    empresas = null; lidas = null;
+    empresas = null; lidas = null; Condicoes.limpar();
     for (const e of ['kos', 'godks']) NOMES_EMPRESA[e] = '';
     document.querySelectorAll('img[data-logo]').forEach(i => i.removeAttribute('src'));
     el('if_empresa_nome').textContent = '';
