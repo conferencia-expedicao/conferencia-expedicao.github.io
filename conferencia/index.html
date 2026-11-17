@@ -81,6 +81,7 @@ h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
 .cab-conf .nota-mes{color:var(--espera);font-size:14px;font-weight:500}
 .cab-conf .num{color:var(--tinta2);font-size:13.5px;margin-top:2px}
 .cab-conf .num b{font-weight:650;color:var(--tinta);font-variant-numeric:tabular-nums}
+.cab-conf>div:first-child{flex:1 1 440px;min-width:0}
 .cab-conf .acoes{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
 .sit{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:650;padding:2px 10px;border-radius:99px}
 .sit::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
@@ -104,7 +105,8 @@ h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
 .cartao .rot{font-size:12px;font-weight:650;color:var(--tinta2);text-transform:uppercase;letter-spacing:.05em}
 .cartao .val{font-size:30px;font-weight:700;line-height:1.15;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .cartao .val small{font-size:15px;font-weight:500;color:var(--tinta2);letter-spacing:0}
-.cartao .sub{font-size:13px;color:var(--tinta2);min-height:20px;display:flex;align-items:center}
+.cartao .sub{font-size:13px;color:var(--tinta2);min-height:20px;display:flex;align-items:center;flex-wrap:wrap;row-gap:5px}
+.cartao .detalhe{width:100%;font-size:12.5px;color:var(--tinta2)}
 .cartao.erro .val{color:var(--erro)} .cartao.espera .val{color:var(--espera)} .cartao.ok .val{color:var(--ok)}
 .cartao.erro .sub,.cartao.aviso .sub{color:var(--erro)}
 .cartao.aviso .sub{font-weight:600}
@@ -282,7 +284,7 @@ dialog .conta-erro{padding:8px 22px 0;min-height:18px;color:var(--erro);font-siz
     <span class="logo" aria-hidden="true"></span>
     <div>
       <h1>Conferência de etiquetas</h1>
-      <span class="rota">GODKS &rarr; KOS · v5.3</span>
+      <span class="rota">GODKS &rarr; KOS · v5.4</span>
     </div>
   </div>
   <div class="dir">
@@ -1974,7 +1976,7 @@ function tabela(titulo, colunas, linhas) {
 
 function imprimir(tipo) {
   const t = conf.totais || {};
-  const nBip = (conf.bipadas || []).filter(b => b.produto).length;
+  const nc = contagens(), nBip = nc.bip;
   const titulos = { tudo: 'Conferência de etiquetas',
                     paradas: 'Transferências pendentes',
                     faltam: 'Apontamentos sem etiqueta bipada',
@@ -2032,7 +2034,7 @@ function imprimir(tipo) {
     <div class="folha">
       <h1>${esc(titulos[tipo])}</h1>
       <p class="sub">GODKS &rarr; KOS · Relatório de ${esc(periodoTexto(conf))}</p>
-      <p class="sub">${num(nBip)} de ${num(t.apontamentos || 0)} apontamentos bipados ·
+      <p class="sub">${num(nc.bip + nc.mao)} de ${num(t.apontamentos || 0)} apontamentos ${nc.mao ? `conferidos (${num(nc.bip)} ${nc.bip === 1 ? 'bipado' : 'bipados'} + ${num(nc.mao)} à mão)` : 'bipados'} ·
          ${num(t.transferencias || 0)} transferências · ${num(t.itensKos || 0)} itens KOS
          entre ${num(t.produtos || 0)} produtos</p>
       ${corpo}
@@ -2103,11 +2105,16 @@ function precisaAcao(b) {
 function contagens() {
   const bip = conf.bipadas || [], pend = conf.pendencias || [];
   return {
-    bip: bip.filter(b => b.produto).length, total: (conf.totais || {}).apontamentos || 0, lidas: bip.length,
+    bip: bip.filter(b => b.produto).length, mao: conferidasAMao(), total: (conf.totais || {}).apontamentos || 0, lidas: bip.length,
     prob: bip.filter(precisaAcao).length + (conf.negativos || []).length,
     pend: pend.length, atrasadas: pend.filter(p => p.idade > PRAZO_NORMAL).length,
     faltam: semEtiqueta().length, faltamVelhas: semEtiqueta().filter(p => p.dias > DIAS_SEM_BIPAR).length
   };
+}
+
+/* "3 bipadas + 1 conferida à mão": o que fecha a conta do cartão Bipadas e do cabeçalho. */
+function detalheFeitas(n) {
+  return `${num(n.bip)} ${n.bip === 1 ? 'bipada' : 'bipadas'} + ${num(n.mao)} ${n.mao === 1 ? 'conferida' : 'conferidas'} à mão`;
 }
 
 function melhorAba() {
@@ -2140,14 +2147,15 @@ function render() {
 
 function renderResumo() {
   const t = conf.totais || {};
+  const n = contagens();
   const notaMes = { 'mes-anterior': 'mês anterior, deduzido', 'manual': 'mês trocado por você' }[conf.deduzido];
   const avisoMes = notaMes ? ` <span class="nota-mes">(${notaMes})</span>` : '';
   $('resumo').innerHTML = `
     <div>
       <div class="periodo"><span>Relatório de ${esc(periodoTexto(conf))}${avisoMes}</span>
         <span class="sit ${conf.status}">${conf.status === 'concluida' ? 'Concluída' : 'Em espera'}</span></div>
-      <div class="num"><b>${num((conf.bipadas||[]).filter(b=>b.produto).length)}</b> de
-        <b>${num(t.apontamentos||0)}</b> apontamentos bipados,
+      <div class="num"><b>${num(n.bip + n.mao)}</b> de
+        <b>${num(t.apontamentos||0)}</b> apontamentos ${n.mao ? `conferidos (${num(n.bip)} ${n.bip === 1 ? 'bipado' : 'bipados'} + ${num(n.mao)} à mão)` : 'bipados'},
         <b>${num(t.transferencias||0)}</b> transferências,
         <b>${num(t.itensKos||0)}</b> itens KOS entre <b>${num(t.produtos||0)}</b> produtos${
         conf.emissao ? ` · emitido no ERP em <b>${dd(conf.emissao.dia)}/${dd(conf.emissao.mes)}${conf.horaEmissao ? ' às ' + esc(conf.horaEmissao) : ''}</b>` : ''}</div>
@@ -2175,13 +2183,14 @@ function renderAvisoVelho() {
 
 function renderCartoes() {
   const n = contagens();
-  const pct = n.total ? Math.min(100, Math.round(n.bip / n.total * 100)) : 0;
+  const pct = n.total ? Math.min(100, Math.round((n.bip + n.mao) / n.total * 100)) : 0;
   const s = (q, um, varios) => q === 1 ? um : varios;
   const c = (id, rotulo, valor, sub, tom) => `<button class="cartao ${tom}${aba === id ? ' ativo' : ''}" data-aba="${id}">
       <span class="rot">${rotulo}</span><span class="val">${valor}</span><span class="sub">${sub}</span></button>`;
   $('cartoes').innerHTML =
-    c('bipadas', 'Bipadas', `${num(n.bip)}<small> de ${num(n.total)}</small>`,
-      `<span class="barra" title="${pct}%"><i style="width:${pct}%"></i></span>`, '') +
+    c('bipadas', 'Bipadas', `${num(n.bip + n.mao)}<small> de ${num(n.total)}</small>`,
+      `<span class="barra" title="${pct}%"><i style="width:${pct}%"></i></span>` +
+      (n.mao ? `<span class="detalhe">${detalheFeitas(n)}</span>` : ''), '') +
     c('problemas', 'Problemas', num(n.prob), n.prob ? s(n.prob, 'precisa de você', 'precisam de você') : 'nenhum',
       n.prob ? 'erro' : 'ok') +
     c('paradas', 'Transferências paradas', num(n.pend),
@@ -2382,7 +2391,7 @@ function renderListas() {
   if (!faltam.length) {
     hf = `<div class="vazio-bom"><b>Nenhuma.</b>Toda etiqueta apontada no período passou pela sua mão.</div>`;
   } else {
-    const n = contagens(), nJust = (conf.justificados || []).length;
+    const n = contagens(), nJust = n.mao;
     hf += `<div class="aba-cab">
         <span class="txt">De ${num(n.total)} apontamentos do período você bipou ${num(n.bip)}${
           nJust ? ` e marcou ${num(nJust)} como conferido` : ''}.
@@ -2505,11 +2514,30 @@ window.addEventListener('focus', () => verificarLotes());
 
 /* Apontamentos do relatório que não têm etiqueta bipada: ou o material ainda
    não chegou na expedição, ou chegou e passou batido. */
-function semEtiqueta() {
-  if (!rel) return [];
-  const bipados = new Set((conf.bipadas || [])
+function chavesBipadas() {
+  return new Set((conf.bipadas || [])
     .filter(b => b.produto && b.doc && (!b.resolvida || b.nivel !== 'erro' || /^Transferência/.test(b.titulo || '')))
     .map(b => b.produto + '|' + b.doc));
+}
+
+/* Apontamentos que você marcou como "Já conferi" sem bipar e que ainda não foram bipados.
+   Se a etiqueta for bipada depois, ela passa a contar como bipada e sai desta conta. */
+function conferidasAMao() {
+  if (!rel) return 0;
+  const bipados = chavesBipadas(), justificados = new Set(conf.justificados || []);
+  let n = 0;
+  for (const [codigo, p] of rel.produtos) {
+    for (const ap of p.apontamentos) {
+      const chave = codigo + '|' + ap.doc;
+      if (justificados.has(chave) && !bipados.has(chave)) n++;
+    }
+  }
+  return n;
+}
+
+function semEtiqueta() {
+  if (!rel) return [];
+  const bipados = chavesBipadas();
   const justificados = new Set(conf.justificados || []);
   const fora = [];
   for (const [codigo, p] of rel.produtos) {
