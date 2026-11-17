@@ -377,6 +377,7 @@
 
   .static-valor{ font-size:14px; font-weight:bold; margin:10px 0 14px 0; }
   .pedido-num input#pedido_num{ text-align:center; font-weight:bold; }
+  .sheet input, .sheet textarea, .montador input{ scroll-margin-top:96px; scroll-margin-bottom:28px; }
   .field-table textarea.campo-linhas{ display:block; resize:none; overflow:hidden; line-height:1.15; height:auto; min-height:0; }
   .field-table textarea.campo-linhas.auto-filled{ background:var(--auto); border-bottom:1px solid var(--auto-border); }
   textarea.faltando{ background:#fee2e2 !important; border-bottom:2px solid #dc2626 !important; }
@@ -594,7 +595,7 @@
   <div class="app-bar-in">
     <div class="app-marca"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></div>
     <div class="app-nome">
-      <h2 class="app-title">Central de Documentos <span class="versao">v7</span></h2>
+      <h2 class="app-title">Central de Documentos <span class="versao">v8</span></h2>
       <p class="app-sub" id="app-sub">Liberação de Pedidos &middot; KOS / GODKS</p>
     </div>
     <div class="pt-conta">
@@ -659,7 +660,7 @@
       <td><input type="text" autocomplete="off" id="cond_pagamento" aria-label="Condição de pagamento" placeholder="ex: 30 dias"></td>
       <td class="code-lbl">código:</td>
       <td><input type="text" autocomplete="off" class="code-input manual-field" id="cond_pagamento_codigo" aria-label="Código da condição de pagamento"></td>
-      <td></td>
+      <td class="tab-info" id="cond_info" aria-live="polite"></td>
     </tr>
     <tr><td class="label">NAT. OPERAÇÃO:</td><td colspan="4"><input type="text" autocomplete="off" id="nat_operacao" aria-label="Natureza da operação"></td></tr>
     <tr>
@@ -1236,7 +1237,7 @@ ligarFormatacoes();
 
 // campos que a cotação preenche sozinha
 const CAMPOS_AUTO = ['cliente','codigo','nat_operacao','cond_pagamento','tabela','tabela_codigo',
-                     'transportadora','transportadora_codigo','representante','representante_codigo','valor_pedido'];
+                     'transportadora','transportadora_codigo','representante','representante_codigo','valor_pedido','frete'];
 let cotacaoNoFormulario = false;   // já existe uma cotação extraída neste formulário?
 
 function limparCampo(i){ i.value=''; i.classList.remove('auto-filled'); i.classList.remove('faltando'); if (typeof Cabe !== 'undefined') Cabe.ajustar(i); }
@@ -1246,6 +1247,7 @@ function limparLiberacao(){
   document.querySelectorAll('#view-liberacao .sheet input[type=text], #view-liberacao .sheet input[type=number], #view-liberacao .sheet textarea').forEach(limparCampo);
   cotacaoNoFormulario = false;
   if (typeof Tabelas !== 'undefined') Tabelas.dica('');
+  if (typeof Atalhos !== 'undefined') Atalhos.dicaCond('');
   preencherRecebidoHoje();
 }
 
@@ -1493,6 +1495,7 @@ async function extractFromCotacao(){
     setAuto('tabela_codigo', d.tabela_codigo);
     setAuto('transportadora', d.transportadora);
     setAuto('transportadora_codigo', d.transportadora_codigo);
+    if (typeof Atalhos !== 'undefined') Atalhos.freteDaCotacao(d.transportadora);
     setAuto('representante', d.representante);
     setAuto('representante_codigo', d.representante_codigo);
     setAuto('valor_pedido', d.valor_total);
@@ -1505,6 +1508,7 @@ async function extractFromCotacao(){
       aviso = ' Não identifiquei a empresa no cabeçalho: confira se o formulário certo é KOS ou GODKS.';
     }
 
+    if (typeof Atalhos !== 'undefined') Atalhos.dicaCond('');
     let extraCond = '';
     try { extraCond = await Condicoes.aplicar(d.empresa, d.cond_pagamento); } catch(e){ console.error(e); }
     let extraTab = '';
@@ -2504,6 +2508,113 @@ const Cabe = (function () {
   document.querySelectorAll('#view-liberacao .field-table textarea').forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); }));
   window.addEventListener('beforeprint', todos);
   return { ajustar, todos };
+})();
+</script>
+<script>
+/* ---------- atalhos de preenchimento ----------
+   1. Navegação: Enter ou seta para baixo vai para o próximo campo; seta para cima volta.
+      Vale na Liberação e na Instrução Financeira (inclusive nos campos de cima da instrução).
+      Na caixa de texto da INSTRUÇÃO: Shift+Enter quebra a linha, e as setas só trocam de campo
+      quando o cursor já está no começo (para cima) ou no fim (para baixo) do texto.
+      No MOTIVO, as setas abrem as sugestões, como antes; Enter vai para o próximo.
+   2. Frete: transportadora com KOS ou GODKS no nome é CIF; qualquer outra é FOB.
+   3. Condição de pagamento: digitar o código preenche a condição (e digitar a condição, com o código
+      vazio, preenche o código quando só existe um, ou quando há um padrão). */
+const Atalhos = (function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const NOME = { kos: 'KOS', godks: 'GODKS' };
+
+  /* ---- 1. navegação ---- */
+  const EDITAVEIS = 'input[type=text], input:not([type]), input[type=number], textarea';
+  function campos() {
+    const vista = docAtual === 'instrucao' ? $('view-instrucao') : $('view-liberacao');
+    return [...vista.querySelectorAll(EDITAVEIS)].filter(el =>
+      !el.disabled && !el.readOnly && el.id !== 'cotacao_file' && el.offsetParent !== null && !el.closest('#via-copia'));
+  }
+  function ir(el, passo) {
+    const lista = campos(), i = lista.indexOf(el), alvo = lista[i + passo];
+    if (i < 0 || !alvo) return false;
+    alvo.focus();
+    const fim = alvo.value.length;
+    try { alvo.setSelectionRange(fim, fim); } catch (e) {}
+    return true;
+  }
+  document.addEventListener('keydown', ev => {
+    const el = ev.target;
+    if (!(el instanceof HTMLElement) || !el.matches(EDITAVEIS) || ev.altKey || ev.ctrlKey || ev.metaKey || ev.isComposing) return;
+    if (!el.closest('#view-liberacao, #view-instrucao')) return;
+    const textoLivre = el.tagName === 'TEXTAREA' && !el.classList.contains('campo-linhas');   // a INSTRUÇÃO
+    let passo = 0;
+    if (ev.key === 'Enter' && !ev.shiftKey) passo = 1;
+    else if (ev.key === 'Enter') { if (!textoLivre) ev.preventDefault(); return; }
+    else if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+      if (ev.shiftKey || el.hasAttribute('list')) return;                                      // MOTIVO: sugestões
+      if (textoLivre) {
+        const noFim = el.selectionStart === el.value.length && el.selectionEnd === el.value.length;
+        const noComeco = el.selectionStart === 0 && el.selectionEnd === 0;
+        if ((ev.key === 'ArrowDown' && !noFim) || (ev.key === 'ArrowUp' && !noComeco)) return;
+      }
+      passo = ev.key === 'ArrowDown' ? 1 : -1;
+    }
+    if (!passo) return;
+    ev.preventDefault();
+    ir(el, passo);
+  });
+
+  /* ---- 2. frete pela transportadora ---- */
+  const soLetrasEspacos = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]+/g, ' ');
+  function freteDe(transportadora) {
+    const t = soLetrasEspacos(transportadora).trim();
+    if (!t) return null;
+    return /(^| )(KOS|GODKS)( |$)/.test(t) ? 'CIF' : 'FOB';
+  }
+  /* depois de ler a cotação: sempre pela regra */
+  function freteDaCotacao(transportadora) {
+    const f = freteDe(transportadora);
+    if (f) { setAuto('frete', f); $('frete').classList.remove('faltando'); }
+  }
+  /* trocou a transportadora à mão: só mexe no frete se ele estiver vazio ou tiver sido preenchido pela regra */
+  $('transportadora').addEventListener('change', () => {
+    const frete = $('frete'), f = freteDe($('transportadora').value);
+    if (!f || (frete.value.trim() && !frete.classList.contains('auto-filled'))) return;
+    frete.value = ''; setAuto('frete', f); frete.classList.remove('faltando');
+  });
+  $('frete').addEventListener('input', () => $('frete').classList.remove('auto-filled'));
+
+  /* ---- 3. condição de pagamento pelo código (e o código pela condição) ---- */
+  const semZero = c => String(c).replace(/^0+(?=\d)/, '');
+  const comoNaCotacao = prazo => /^\d+$/.test(prazo) ? prazo + ' DIAS' : prazo;   // "30" -> "30 DIAS", "30/60" fica
+  function dicaCond(texto, alerta) {
+    const d = $('cond_info'); if (!d) return;
+    d.textContent = texto || ''; d.title = texto || ''; d.classList.toggle('alerta', !!alerta);
+  }
+  function aoDigitarCodigoCond() {
+    const campo = $('cond_pagamento_codigo'), texto = campo.value.trim();
+    if (!texto) { dicaCond(''); return; }
+    const lista = Condicoes.lista;
+    if (!lista) { dicaCond('lista de condições não carregada', true); return; }
+    if (!/^\d{1,5}$/.test(texto)) { dicaCond('o código é só número', true); return; }
+    const c = lista.find(x => x.empresa === empresaAtual && semZero(x.codigo) === semZero(texto));
+    if (!c) { dicaCond(`código ${semZero(texto)} não existe na ${NOME[empresaAtual]}`, true); return; }
+    campo.value = semZero(c.codigo);
+    const cond = $('cond_pagamento');
+    cond.value = ''; setAuto('cond_pagamento', comoNaCotacao(c.prazo)); cond.classList.remove('faltando');
+    dicaCond('');
+  }
+  function aoDigitarCondicao() {
+    const codigo = $('cond_pagamento_codigo'), texto = $('cond_pagamento').value.trim();
+    if (codigo.value.trim() || !texto || !Condicoes.lista) return;
+    const r = resolverCondicao(Condicoes.lista, empresaAtual, texto);
+    if (r.tipo === 'unico' || r.tipo === 'padrao' || r.tipo === 'aproximado') { setAuto('cond_pagamento_codigo', semZero(r.codigo)); codigo.classList.remove('faltando'); dicaCond(''); }
+    else if (r.tipo === 'varios') dicaCond(`${r.opcoes.length} códigos para ${r.opcoes[0].prazo}: digite o código`, true);
+    else if (r.tipo === 'nenhum') dicaCond(`não achei "${texto}" na ${NOME[empresaAtual]}`, true);
+  }
+  $('cond_pagamento_codigo').addEventListener('change', aoDigitarCodigoCond);
+  $('cond_pagamento_codigo').addEventListener('input', () => { if (!$('cond_pagamento_codigo').value.trim()) dicaCond(''); });
+  $('cond_pagamento').addEventListener('change', aoDigitarCondicao);
+
+  return { freteDe, freteDaCotacao, dicaCond };
 })();
 </script>
 <script>
