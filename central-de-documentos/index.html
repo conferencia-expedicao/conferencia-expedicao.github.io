@@ -376,6 +376,18 @@
   .sr-section{ font-weight:bold; text-decoration:underline; font-size:12px; margin-top:8px; }
 
   .static-valor{ font-size:14px; font-weight:bold; margin:10px 0 14px 0; }
+  .pedido-num input#pedido_num{ text-align:center; font-weight:bold; }
+  .field-table textarea.campo-linhas{ display:block; resize:none; overflow:hidden; line-height:1.15; height:auto; min-height:0; }
+  .field-table textarea.campo-linhas.auto-filled{ background:var(--auto); border-bottom:1px solid var(--auto-border); }
+  textarea.faltando{ background:#fee2e2 !important; border-bottom:2px solid #dc2626 !important; }
+  .sr-campo{ display:inline-flex; align-items:baseline; gap:6px; }
+  .static-signoff input.sr-data{ width:120px; display:inline-block; text-align:center; font-size:14px; padding:0 2px; }
+  .static-valor input.valor-input{ width:220px; display:inline-block; font-size:15px; padding:0 4px; }
+  table.grid-static.campos td{ padding:0; }
+  table.grid-static.campos td input[type=text], .grid-static.caixa div input[type=text]{
+    display:block; width:100%; height:21px; border:none; border-radius:0; font-size:14px; padding:1px 6px; background:transparent;
+  }
+  table.grid-static.campos td input[type=text]:focus, .grid-static.caixa div input[type=text]:focus{ background:#fff7e6; border:none; }
 
   table.grid-static{ width:100%; border-collapse:collapse; margin-bottom:10px; }
   table.grid-static th{ border:1px solid var(--line); font-size:11px; padding:4px 6px; background:#f0f0f0; text-align:left; }
@@ -414,7 +426,7 @@
     body.duas-vias .if-logo.if-logo-god{ height:33px; }
     body.duas-vias .if-linha{ padding:5px 12px; }
     body.duas-vias #view-instrucao{ page-break-inside:avoid; break-inside:avoid; }
-    input.faltando{ background:transparent !important; border-bottom:1px dotted #999 !important; }
+    input.faltando, textarea.faltando{ background:transparent !important; border-bottom:1px dotted #999 !important; }
     input:focus-visible, .btn:focus-visible{ outline:none !important; }
     .sheet{
       box-shadow:none; border:none; border-radius:0; max-width:100%; width:100%;
@@ -433,7 +445,7 @@
     .logo{ height:58px; }
     .logo-wide{ height:72px; }
     .field-table td{ padding:3.5px 8px; }
-    col.c-label { width:150px; }
+    col.c-label { width:164px; }   /* cabe "COD. REPRESENTANTE:" no papel */
     col.c-codlbl{ width:44px;  }
     col.c-cod   { width:88px;  }
     col.c-frete { width:146px; }
@@ -447,6 +459,7 @@
     table.grid-static td{ height:23px; }
     table.grid-static th{ padding:3px 6px; }
     .grid-static.caixa div{ height:23px; }
+    table.grid-static.campos td input[type=text], .grid-static.caixa div input[type=text]{ height:22px; }
   }
 
 
@@ -581,7 +594,7 @@
   <div class="app-bar-in">
     <div class="app-marca"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></div>
     <div class="app-nome">
-      <h2 class="app-title">Central de Documentos <span class="versao">v6</span></h2>
+      <h2 class="app-title">Central de Documentos <span class="versao">v7</span></h2>
       <p class="app-sub" id="app-sub">Liberação de Pedidos &middot; KOS / GODKS</p>
     </div>
     <div class="pt-conta">
@@ -632,7 +645,7 @@
   </div>
   <div class="header">
     <h1>LIBERAÇÃO DE PEDIDOS</h1>
-    <div class="pedido-num">PEDIDO NUM <input type="text" autocomplete="off" id="pedido_num" aria-label="Pedido número"></div>
+    <div class="pedido-num">PEDIDO NUM <input type="text" autocomplete="off" class="manual-field" id="pedido_num" aria-label="Pedido número"></div>
   </div>
 
   <table class="field-table">
@@ -658,7 +671,7 @@
     </tr>
     <tr>
       <td class="label">TRANSPORTADORA:</td>
-      <td><input type="text" autocomplete="off" id="transportadora" aria-label="Transportadora"></td>
+      <td><textarea class="campo-linhas" id="transportadora" rows="1" autocomplete="off" spellcheck="false" aria-label="Transportadora"></textarea></td>
       <td class="code-lbl">código:</td>
       <td><input type="text" autocomplete="off" class="code-input" id="transportadora_codigo" aria-label="Código da transportadora"></td>
       <td class="frete-cell"><span class="frete-lbl">FRETE:</span><input type="text" autocomplete="off" class="manual-field" id="frete" aria-label="Frete"></td>
@@ -684,7 +697,7 @@
 
   <div class="static-signoff">
     <div class="sr-row">
-      <span>RECEBIDO: ____/____/______</span>
+      <span class="sr-campo">RECEBIDO: <input type="text" autocomplete="off" id="recebido_data" aria-label="Data de recebimento" class="sr-data" inputmode="numeric"></span>
       <span>VISTO: <span class="blank-line"></span></span>
     </div>
     <div class="sr-section">DEP. COMERCIAL</div>
@@ -704,21 +717,21 @@
     </div>
   </div>
 
-  <div class="static-valor">VALOR: R$<span class="blank-line long"></span></div>
+  <div class="static-valor">VALOR: R$ <input type="text" autocomplete="off" id="valor_pedido" aria-label="Valor" class="valor-input" inputmode="decimal"></div>
 
   <h3 class="section">REFERÊNCIAS COMERCIAIS <span style="float:right">TELEFONE</span></h3>
-  <table class="grid-static"><tr><td></td><td></td></tr><tr><td></td><td></td></tr><tr><td></td><td></td></tr></table>
+  <table class="grid-static campos"><tr><td><input type="text" autocomplete="off" id="ref_com_1" aria-label="Referência comercial 1"></td><td><input type="text" autocomplete="off" id="ref_com_1_tel" aria-label="Telefone da referência comercial 1"></td></tr><tr><td><input type="text" autocomplete="off" id="ref_com_2" aria-label="Referência comercial 2"></td><td><input type="text" autocomplete="off" id="ref_com_2_tel" aria-label="Telefone da referência comercial 2"></td></tr><tr><td><input type="text" autocomplete="off" id="ref_com_3" aria-label="Referência comercial 3"></td><td><input type="text" autocomplete="off" id="ref_com_3_tel" aria-label="Telefone da referência comercial 3"></td></tr></table>
 
   <h3 class="section">REFERÊNCIAS BANCÁRIAS</h3>
-  <table class="grid-static">
+  <table class="grid-static campos">
     <tr><th>Banco</th><th>Telefone</th><th>Agência</th><th>Conta Corrente</th></tr>
-    <tr><td></td><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td><input type="text" autocomplete="off" id="ref_ban_1_banco" aria-label="Banco 1"></td><td><input type="text" autocomplete="off" id="ref_ban_1_tel" aria-label="Telefone do banco 1"></td><td><input type="text" autocomplete="off" id="ref_ban_1_agencia" aria-label="Agência 1"></td><td><input type="text" autocomplete="off" id="ref_ban_1_conta" aria-label="Conta corrente 1"></td></tr>
+    <tr><td><input type="text" autocomplete="off" id="ref_ban_2_banco" aria-label="Banco 2"></td><td><input type="text" autocomplete="off" id="ref_ban_2_tel" aria-label="Telefone do banco 2"></td><td><input type="text" autocomplete="off" id="ref_ban_2_agencia" aria-label="Agência 2"></td><td><input type="text" autocomplete="off" id="ref_ban_2_conta" aria-label="Conta corrente 2"></td></tr>
+    <tr><td><input type="text" autocomplete="off" id="ref_ban_3_banco" aria-label="Banco 3"></td><td><input type="text" autocomplete="off" id="ref_ban_3_tel" aria-label="Telefone do banco 3"></td><td><input type="text" autocomplete="off" id="ref_ban_3_agencia" aria-label="Agência 3"></td><td><input type="text" autocomplete="off" id="ref_ban_3_conta" aria-label="Conta corrente 3"></td></tr>
   </table>
 
   <h3 class="section">CAIXA DE TEXTO</h3>
-  <div class="grid-static caixa"><div></div><div></div><div></div></div>
+  <div class="grid-static caixa"><div><input type="text" autocomplete="off" id="caixa_texto_1" aria-label="Caixa de texto, linha 1"></div><div><input type="text" autocomplete="off" id="caixa_texto_2" aria-label="Caixa de texto, linha 2"></div><div><input type="text" autocomplete="off" id="caixa_texto_3" aria-label="Caixa de texto, linha 3"></div></div>
 </div>
 
 </div><!-- /view-liberacao -->
@@ -1210,21 +1223,30 @@ function switchTemplate(t){
 switchTemplate('kos');
 montarInstrucao();
 preencherDataHoje();
+// RECEBIDO da Liberação: dd/mm/aaaa de hoje, em verde (dá para trocar)
+function preencherRecebidoHoje(){
+  const campo = document.getElementById('recebido_data');
+  if(!campo || campo.value.trim()) return;
+  const d = new Date(), p2 = n => String(n).padStart(2,'0');
+  setAuto('recebido_data', p2(d.getDate()) + '/' + p2(d.getMonth()+1) + '/' + d.getFullYear());
+}
+preencherRecebidoHoje();
 document.getElementById('if_instrucao').addEventListener('input', function(){ ajustarAltura(this); });
 ligarFormatacoes();
 
 // campos que a cotação preenche sozinha
 const CAMPOS_AUTO = ['cliente','codigo','nat_operacao','cond_pagamento','tabela','tabela_codigo',
-                     'transportadora','transportadora_codigo','representante','representante_codigo'];
+                     'transportadora','transportadora_codigo','representante','representante_codigo','valor_pedido'];
 let cotacaoNoFormulario = false;   // já existe uma cotação extraída neste formulário?
 
-function limparCampo(i){ i.value=''; i.classList.remove('auto-filled'); i.classList.remove('faltando'); }
+function limparCampo(i){ i.value=''; i.classList.remove('auto-filled'); i.classList.remove('faltando'); if (typeof Cabe !== 'undefined') Cabe.ajustar(i); }
 
 // limpa só a Liberação (antes apagava também os campos da Instrução Financeira)
 function limparLiberacao(){
-  document.querySelectorAll('#view-liberacao .sheet input[type=text], #view-liberacao .sheet input[type=number]').forEach(limparCampo);
+  document.querySelectorAll('#view-liberacao .sheet input[type=text], #view-liberacao .sheet input[type=number], #view-liberacao .sheet textarea').forEach(limparCampo);
   cotacaoNoFormulario = false;
   if (typeof Tabelas !== 'undefined') Tabelas.dica('');
+  preencherRecebidoHoje();
 }
 
 function clearForm(){
@@ -1293,6 +1315,7 @@ function setAuto(id, value){
   if(!el) return;
   el.value = value;
   el.classList.add('auto-filled');
+  if (typeof Cabe !== 'undefined') Cabe.ajustar(el);
 }
 
 // Ao digitar, some o destaque de "faltando"
@@ -1472,6 +1495,7 @@ async function extractFromCotacao(){
     setAuto('transportadora_codigo', d.transportadora_codigo);
     setAuto('representante', d.representante);
     setAuto('representante_codigo', d.representante_codigo);
+    setAuto('valor_pedido', d.valor_total);
 
     let aviso = '';
     if(d.empresa){
@@ -2417,6 +2441,69 @@ const Tabelas = (function () {
   };
   if (sistema && sistema.addEventListener) sistema.addEventListener('change', pintar);
   pintar();
+})();
+</script>
+<script>
+/* ---------- texto que não cabe no campo: a letra diminui, e a transportadora pode usar 2 linhas ----------
+   Vale para os campos da tabela da Liberação (transportadora, cliente, tabela, frete...). A letra encolhe só o
+   necessário para o texto inteiro caber na tela E no papel (na impressão os campos são mais estreitos).
+   Nos campos de uma linha o mínimo é 9px. A TRANSPORTADORA, que costuma ter nome comprido, encolhe até 12px
+   numa linha; se ainda não couber, passa para 2 linhas (letra de até 13px, para a linha não ficar alta demais; mínimo 9px). */
+const Cabe = (function () {
+  'use strict';
+  const MINIMO = 9, MINIMO_UMA_LINHA = 12, MAXIMO_DUAS_LINHAS = 13;
+  /* larguras das colunas no papel (A4 com margem de 10mm = 718px; as mesmas do @media print) */
+  const PAPEL = { 'c-label': 164, 'c-codlbl': 44, 'c-cod': 88, 'c-frete': 146 };
+  const LARGURA_PAPEL = 718 - 4;   // menos a borda da tabela
+  const regua = document.createElement('canvas').getContext('2d');
+  const CAMPOS = '#view-liberacao .field-table input[type=text], #view-liberacao .field-table textarea';
+
+  function larguraNoPapel(el) {
+    if (el.closest('td.frete-cell')) return 72;                 // FRETE tem largura fixa no papel
+    const td = el.closest('td'), tabela = el.closest('table.field-table');
+    if (!td || !tabela) return Infinity;
+    const cols = [...tabela.querySelectorAll('col')].map(c => PAPEL[c.className] || 0);
+    const campo = LARGURA_PAPEL - cols.reduce((a, b) => a + b, 0);
+    let inicio = 0;
+    for (const cel of td.parentElement.cells) { if (cel === td) break; inicio += cel.colSpan; }
+    let soma = 0;
+    for (let i = inicio; i < inicio + td.colSpan && i < cols.length; i++) soma += cols[i] || campo;
+    return soma - 16;                                            // padding da célula no papel
+  }
+
+  function ajustar(el) {
+    if (!el) return;
+    const linhas = el.tagName === 'TEXTAREA';
+    el.style.fontSize = ''; el.style.width = '';
+    if (linhas) el.rows = 1;
+    const texto = el.value;
+    if (!texto) return;
+    const cs = getComputedStyle(el), base = parseFloat(cs.fontSize), folga = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 6;   // margem para diferenças de fonte entre tela e papel
+    const papel = larguraNoPapel(el), largura = Math.min(el.clientWidth || Infinity, papel);
+    const cabe = largura - folga;
+    regua.font = `${cs.fontStyle} ${cs.fontWeight} ${base}px ${cs.fontFamily}`;
+    const precisa = regua.measureText(texto).width;
+    if (precisa <= cabe) return;
+    const umaLinha = Math.floor(base * cabe / precisa * 10) / 10;
+    if (!linhas || umaLinha >= MINIMO_UMA_LINHA) { el.style.fontSize = Math.max(MINIMO, umaLinha) + 'px'; return; }
+    /* duas linhas: o campo fica com a largura do papel (a quebra de linha é a mesma na tela e na impressão) */
+    el.rows = 2;
+    if (isFinite(papel)) el.style.width = Math.min(el.clientWidth, papel) + 'px';
+    let t = Math.min(MAXIMO_DUAS_LINHAS, base, Math.floor(base * cabe * 1.8 / precisa * 10) / 10);
+    for (; t > MINIMO; t -= 0.5) { el.style.fontSize = t + 'px'; if (el.scrollHeight <= el.clientHeight + 1) return; }
+    el.style.fontSize = MINIMO + 'px';
+  }
+  const todos = () => document.querySelectorAll(CAMPOS).forEach(ajustar);
+
+  document.querySelectorAll(CAMPOS).forEach(el => el.addEventListener('input', () => {
+    if (el.tagName === 'TEXTAREA' && /[\r\n]/.test(el.value)) el.value = el.value.replace(/[\r\n]+/g, ' ');
+    el.classList.remove('faltando');
+    ajustar(el);
+  }));
+  /* Enter na transportadora não pula linha: a quebra é automática */
+  document.querySelectorAll('#view-liberacao .field-table textarea').forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); }));
+  window.addEventListener('beforeprint', todos);
+  return { ajustar, todos };
 })();
 </script>
 <script>
