@@ -1778,7 +1778,9 @@ const Condicoes = (function () {
     $('cond-pick').classList.remove('aberto'); $('cond-painel').classList.remove('aberto');
   }
 
-  const preencher = codigo => setAuto('cond_pagamento_codigo', codigo);
+  /* No formulário o código vai sem o zero à esquerda (0500 vira 500), como o código da transportadora. */
+  const semZero = c => String(c).replace(/^0+(?=\d)/, '');
+  const preencher = codigo => setAuto('cond_pagamento_codigo', semZero(codigo));
   const q = (campo, valor) => campo + '=eq.' + encodeURIComponent(valor);
 
   /* ---- código padrão de um prazo (um por empresa e prazo) ---- */
@@ -1827,14 +1829,14 @@ const Condicoes = (function () {
     if (lista === null) return ' Não consegui carregar a lista de condições de pagamento: preencha o código à mão.';
     const nome = NOME[empresa], r = resolverCondicao(lista, empresa, texto);
     switch (r.tipo) {
-      case 'unico': preencher(r.codigo); return ` Condição ${texto}: código ${r.codigo}.`;
-      case 'padrao': preencher(r.codigo); return ` Condição ${texto}: código ${r.codigo}, o seu padrão (há ${r.opcoes.length} códigos para esse prazo na ${nome}).`;
-      case 'aproximado': preencher(r.codigo); return ` Li "${r.lido}" como "${r.prazo}", código ${r.codigo}. Confira.`;
+      case 'unico': preencher(r.codigo); return ` Condição ${texto}: código ${semZero(r.codigo)}.`;
+      case 'padrao': preencher(r.codigo); return ` Condição ${texto}: código ${semZero(r.codigo)}, o seu padrão (há ${r.opcoes.length} códigos para esse prazo na ${nome}).`;
+      case 'aproximado': preencher(r.codigo); return ` Li "${r.lido}" como "${r.prazo}", código ${semZero(r.codigo)}. Confira.`;
       case 'varios': {
         const esc = await escolher(empresa, r);
         if (!esc.codigo) return ` A condição ${texto} tem ${r.opcoes.length} códigos na ${nome}: escolha o código à mão.`;
         preencher(esc.codigo);
-        return ` Condição ${texto}: código ${esc.codigo}.` + (esc.erroPadrao ? ` Não consegui guardar como padrão (${esc.erroPadrao}).` : '');
+        return ` Condição ${texto}: código ${semZero(esc.codigo)}.` + (esc.erroPadrao ? ` Não consegui guardar como padrão (${esc.erroPadrao}).` : '');
       }
       case 'nenhum': return ` Não achei a condição "${texto}" na lista da ${nome}: preencha o código à mão.`;
       case 'sem-lista': return ` A lista de condições da ${nome} está vazia no banco. Use o botão Condições para carregar.`;
