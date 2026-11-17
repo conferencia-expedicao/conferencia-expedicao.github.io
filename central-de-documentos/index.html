@@ -2008,8 +2008,13 @@ const Condicoes = (function () {
     aguarde('Buscando as logos...', false);
     try {
       const r = await Conta.api('documentos_config?chave=eq.empresas&select=valor');
-      if (r && r[0] && valido(r[0].valor)) aplicar(r[0].valor);
-      else abrirConfig(false);
+      if (r && r[0] && valido(r[0].valor)) { aplicar(r[0].valor); return; }
+      /* Sem logos no resultado há dois casos: o usuário ainda não foi liberado (o banco devolve vazio para ele)
+         ou as logos realmente não foram gravadas. Só no segundo pede o arquivo: ninguém é obrigado a subir logos. */
+      const liberado = await Conta.api('rpc/sou_autorizado', { method: 'POST', body: '{}' });
+      if (liberado === true) abrirConfig(false);
+      else aguarde((Conta.email || 'Este usuário') + ' entrou, mas ainda não foi liberado para ver os dados da Central. ' +
+                   'Peça a quem administra para liberar e depois toque em "Tentar de novo".', true);
     } catch (e) {
       if (e.semSessao || !Conta.logado) abrirEntrar('A sessão expirou. Entre de novo.');
       else aguarde(e.negado ? 'O banco recusou o acesso. Confira se você entrou com o e-mail de trabalho.'
