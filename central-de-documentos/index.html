@@ -510,7 +510,14 @@
   .cond-vazio{padding:16px; color:#94a3b8; font-size:13px; text-align:center;}
   .cond-msg{min-height:18px; margin:0 0 12px 0; font-size:12.5px; color:#6ee7b7; line-height:1.4;}
   .cond-msg.erro{color:#fca5a5;}
-  @media print{ #portao, .pt-conta, .cond-overlay{display:none !important;} }
+  /* ---- tabelas de preço ---- */
+  .field-table td.tab-info{font:11px/1.25 "Segoe UI", system-ui, Arial, sans-serif; color:#3f7a55; white-space:normal; padding:2px 6px;}
+  .field-table td.tab-info.alerta{color:#b45309; font-weight:600;}
+  .cond-linha .cond-c.tab-c{width:70px;}
+  .cond-linha .cond-a em.aviso{color:#fcd34d; background:rgba(252,211,77,.12);}
+  .tab-novo{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 12px 0;}
+  .tab-novo input.cond-campo[type=text]{flex:1 1 110px;}
+  @media print{ #portao, .pt-conta, .cond-overlay{display:none !important;} .field-table td.tab-info{visibility:hidden;} }
 </style>
 
 <div id="portao">
@@ -562,12 +569,13 @@
 
 <div class="app-bar">
   <div>
-    <h2 class="app-title">Central de Documentos <span style="font-size:.6em;font-weight:400;opacity:.65">v4</span></h2>
+    <h2 class="app-title">Central de Documentos <span style="font-size:.6em;font-weight:400;opacity:.65">v5</span></h2>
     <p class="app-sub" id="app-sub">Liberação de Pedidos &middot; KOS / GODKS</p>
   </div>
   <div class="pt-conta">
     <span id="pt-email"></span>
     <button class="btn" id="pt-condicoes" title="Condições de pagamento: códigos e prazos">Condições</button>
+    <button class="btn" id="pt-tabelas" title="Tabelas de preço: códigos e descontos">Tabelas</button>
     <button class="btn" id="pt-logos" title="Trocar as logos e os nomes das empresas">Logos</button>
     <button class="btn" id="pt-sair">Sair</button>
   </div>
@@ -637,7 +645,7 @@
       <td><input type="text" autocomplete="off" id="tabela" aria-label="Tabela"></td>
       <td class="code-lbl">código:</td>
       <td><input type="text" autocomplete="off" class="code-input manual-field" id="tabela_codigo" aria-label="Código da tabela"></td>
-      <td></td>
+      <td class="tab-info" id="tabela_info" aria-live="polite"></td>
     </tr>
     <tr>
       <td class="label">TRANSPORTADORA:</td>
@@ -1205,6 +1213,7 @@ function limparCampo(i){ i.value=''; i.classList.remove('auto-filled'); i.classL
 function limparLiberacao(){
   document.querySelectorAll('#view-liberacao .sheet input[type=text], #view-liberacao .sheet input[type=number]').forEach(limparCampo);
   cotacaoNoFormulario = false;
+  if (typeof Tabelas !== 'undefined') Tabelas.dica('');
 }
 
 function clearForm(){
@@ -1463,7 +1472,9 @@ async function extractFromCotacao(){
 
     let extraCond = '';
     try { extraCond = await Condicoes.aplicar(d.empresa, d.cond_pagamento); } catch(e){ console.error(e); }
-    setStatus('Pronto!' + aviso + extraCond + ' Confira os verdes e complete os amarelos.', 'ok');
+    let extraTab = '';
+    try { extraTab = await Tabelas.aplicar(d.empresa, d); } catch(e){ console.error(e); }
+    setStatus('Pronto!' + aviso + extraCond + extraTab + ' Confira os verdes e complete os amarelos.', 'ok');
   }catch(err){
     console.error(err);
     setStatus('Não consegui ler o PDF. Preencha manualmente. (' + err.message + ')', 'err');
@@ -1954,6 +1965,440 @@ const Condicoes = (function () {
   return { carregar, limpar, aplicar, abrirPainel, get lista() { return lista; } };
 })();
 </script>
+<div id="tab-painel" class="cond-overlay" role="dialog" aria-modal="true" aria-labelledby="tab-titulo">
+  <div class="modal-card cond-card larga">
+    <h3 id="tab-titulo">Tabelas de preço</h3>
+    <p class="modal-sub" id="tab-sub"></p>
+    <div class="cond-abas">
+      <button type="button" class="btn" data-emp="kos">KOS</button>
+      <button type="button" class="btn" data-emp="godks">GODKS</button>
+      <input class="cond-campo" id="tab-busca" type="text" autocomplete="off" placeholder="buscar código, desconto ou cliente" aria-label="Buscar tabela">
+    </div>
+    <div class="cond-lista" id="tab-lista"></div>
+    <form class="tab-novo" id="tab-novo">
+      <input class="cond-campo" id="tab-novo-cod" type="text" autocomplete="off" placeholder="código (ex.: JAN-017)" aria-label="Código da tabela nova">
+      <input class="cond-campo" id="tab-novo-desc" type="text" autocomplete="off" placeholder="descontos (ex.: 20 + 5)" aria-label="Descontos da tabela nova">
+      <input class="cond-campo" id="tab-novo-cli" type="text" autocomplete="off" placeholder="cliente fixo (opcional)" aria-label="Cliente que usa sempre esta tabela">
+      <button type="submit" class="btn" id="tab-adicionar">Adicionar</button>
+    </form>
+    <div class="cond-msg" id="tab-msg" role="status"></div>
+    <div class="modal-acoes">
+      <input type="file" id="tab-pdf" accept=".pdf,application/pdf" style="display:none" aria-label="PDF das tabelas de preço">
+      <button type="button" class="btn" id="tab-atualizar" title="Escolha o PDF do relatório TABELA DE PRECOS (FAT026) do ERP">Atualizar pelo PDF do ERP</button>
+      <button type="button" class="btn primary" id="tab-fechar">Fechar</button>
+    </div>
+  </div>
+</div>
+<script>
+/* ---------- tabelas de preço (descontos): núcleo (sem DOM, testável no Node) ----------
+   O ERP chama de "tabela de preços" um código como JAN-005 com até 5 descontos em cascata
+   (ex.: 20% e depois 5%). A cotação imprime "JAN-005 - 20,00% 5,00% 0,00% 0,00% 0,00%" e a
+   Central mostra "20 + 5%". A lista vem do relatório FAT026 "TABELA DE PRECOS" do ERP. */
+
+/* "11,83" -> 11.83 */
+const numeroBR = s => parseFloat(String(s).replace(/\./g, '').replace(',', '.'));
+/* 11.83 -> "11,83"; 5 -> "5"; 51.6 -> "51,6" */
+const textoBR = n => String(Math.round(n * 100) / 100).replace('.', ',');
+const semZeros = descontos => (descontos || []).map(Number).filter(n => n > 0);
+
+/* [20, 5, 0, 0, 0] -> "20 + 5%"; sem desconto -> "0%" */
+function textoDescontos(descontos) {
+  const d = semZeros(descontos);
+  return d.length ? d.map(textoBR).join(' + ') + '%' : '0%';
+}
+/* chave de comparação: [20, 5, 0, 0, 0] -> "20/5"; sem desconto -> "0" */
+function chaveDescontos(descontos) {
+  const d = semZeros(descontos);
+  return d.length ? d.map(textoBR).join('/') : '0';
+}
+/* texto digitado ou lido ("20 + 5%", "25+10+11,83", "25/5", "0%") -> [20, 5]; nada -> null */
+function lerDescontos(texto) {
+  const nums = [...String(texto || '').matchAll(/\d+(?:[.,]\d+)?/g)].map(m => numeroBR(m[0]));
+  if (!nums.length || nums.length > 5 || nums.some(n => !(n >= 0 && n <= 100))) return null;
+  return nums;
+}
+
+/* "jan5", "JAN-005", "jan 05", "mai/7" -> "JAN-005"; só o número ("5", "005") usa o prefixo padrão da empresa */
+function normalizarCodigo(texto, prefixoPadrao) {
+  const m = String(texto || '').trim().toUpperCase().match(/^([A-Z]{3})?\s*[-\/ ]?\s*(\d{1,3})$/);
+  if (!m) return null;
+  const prefixo = m[1] || prefixoPadrao;
+  return prefixo ? prefixo + '-' + m[2].padStart(3, '0') : null;
+}
+/* o prefixo das tabelas comuns da empresa (KOS: JAN, GODKS: JUN), se for um só */
+function prefixoPadrao(lista, empresa) {
+  const p = new Set((lista || []).filter(t => t.empresa === empresa && !t.cliente).map(t => t.codigo.slice(0, 3)));
+  return p.size === 1 ? [...p][0] : null;
+}
+
+/* nome de cliente só com letras e números: "LOJA & CIA LTDA" -> "LOJACIALTDA" */
+const soLetras = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '');
+function clienteCombina(clienteCotacao, clienteDaTabela) {
+  const regra = soLetras(clienteDaTabela);
+  return regra.length >= 3 && soLetras(clienteCotacao).includes(regra);
+}
+
+/* validade "AAAA-MM-DD" (do banco) já passou? */
+function vencida(tabela, hoje) {
+  if (!tabela || !tabela.validade) return false;
+  const h = hoje || new Date();
+  const dia = `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}-${String(h.getDate()).padStart(2, '0')}`;
+  return String(tabela.validade).slice(0, 10) < dia;
+}
+const dataBR = iso => iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '';
+
+/* Acha a tabela. pedido: { codigo, descontos (array ou null), cliente }.
+   tipo: 'cliente' | 'codigo' | 'desconhecido' | 'desconto' | 'varios' | 'nenhum' | 'sem-lista' | 'vazio'
+   - cliente: o cliente tem tabela fixa (marcada no painel Tabelas);
+   - codigo: o código existe; confere diz se os descontos batem com os do cadastro;
+   - desconto/varios/nenhum: sem código, procurado pelos descontos (tabelas fixas de cliente ficam de fora;
+     se houver vencidas e não vencidas com o mesmo desconto, valem só as não vencidas). */
+function resolverTabela(lista, empresa, pedido, hoje) {
+  const da = (lista || []).filter(t => t.empresa === empresa);
+  const codigo = pedido.codigo ? normalizarCodigo(pedido.codigo, prefixoPadrao(lista, empresa)) || String(pedido.codigo).toUpperCase() : null;
+  const chave = pedido.descontos ? chaveDescontos(pedido.descontos) : null;
+  if (!da.length) return { tipo: 'sem-lista', codigo, chave };
+  if (pedido.cliente) {
+    /* mais de uma tabela do mesmo cliente: vale a não vencida de menor código */
+    const fixas = da.filter(t => t.cliente && clienteCombina(pedido.cliente, t.cliente))
+      .sort((a, b) => (vencida(a, hoje) - vencida(b, hoje)) || (a.codigo < b.codigo ? -1 : 1));
+    const fixa = fixas[0];
+    if (fixa) return { tipo: 'cliente', tabela: fixa, codigo, chave, trocou: !!codigo && codigo !== fixa.codigo };
+  }
+  if (codigo) {
+    const t = da.find(x => x.codigo === codigo);
+    if (!t) return { tipo: 'desconhecido', codigo, chave };
+    return { tipo: 'codigo', tabela: t, codigo, chave, confere: chave === null || chave === t.chave };
+  }
+  if (chave === null) return { tipo: 'vazio' };
+  let iguais = da.filter(t => !t.cliente && t.chave === chave);
+  const validas = iguais.filter(t => !vencida(t, hoje));
+  if (validas.length) iguais = validas;
+  if (iguais.length === 1) return { tipo: 'desconto', tabela: iguais[0], chave };
+  if (iguais.length > 1) return { tipo: 'varios', opcoes: iguais, chave };
+  return { tipo: 'nenhum', chave };
+}
+
+/* Linhas do PDF FAT026 "TABELA DE PRECOS" -> { ehLista, empresa, itens: [{ codigo, descontos, chave, lista, estados, validade }] }.
+   Cada tabela ocupa 3 linhas no relatório; só a primeira traz o código. */
+function lerTabelasPdf(linhas) {
+  const topo = linhas.slice(0, 12);
+  const ehLista = topo.some(l => l.replace(/\s+/g, '').toUpperCase().includes('TABELADEPRECOS')) &&
+                  linhas.some(l => /TAB-NUM/.test(l.replace(/\s+/g, '')) || /TAB-NUM.*DESCONTOS/i.test(l));
+  let empresa = null;
+  for (const l of topo) { const m = l.match(/\b01\s+(KOS|GODKS)\b/i); if (m) { empresa = m[1].toLowerCase(); break; } }
+  const itens = [], vistos = new Map();
+  if (ehLista) for (const l of linhas) {
+    const m = l.match(/^\s*([A-Z]{3}-\d{3})\s+((?:\d{1,3},\d{2}\s+){5})([A-Z])\s+(\d{1,3})\s*(.*?)\s*1,00\s+[\d.]+,\d{2}\s+(\d{2})\/(\d{2})\/(\d{2})\s*$/);
+    if (!m) continue;
+    const descontos = m[2].trim().split(/\s+/).map(numeroBR);
+    if (descontos.some(n => !(n >= 0 && n <= 100))) continue;
+    const item = { codigo: m[1], descontos, chave: chaveDescontos(descontos), lista: m[4], estados: m[5].trim(),
+                   validade: `20${m[8]}-${m[7]}-${m[6]}` };
+    if (vistos.has(item.codigo)) itens[vistos.get(item.codigo)] = item; else { vistos.set(item.codigo, itens.length); itens.push(item); }
+  }
+  return { ehLista, empresa, itens };
+}
+
+/* O que muda no banco ao atualizar pelo PDF. Só entram as tabelas dos prefixos em uso (ex.: JAN e MAI);
+   as outras do ERP (PRO, AGO, NOV...) ficam de fora. */
+function compararTabelas(noBanco, doPdf, prefixos) {
+  const usa = c => prefixos.includes(c.codigo.slice(0, 3));
+  const pdf = doPdf.filter(usa), banco = new Map(noBanco.map(t => [t.codigo, t]));
+  const novos = [], alterados = [], noPdf = new Set(pdf.map(t => t.codigo));
+  for (const t of pdf) {
+    const b = banco.get(t.codigo);
+    if (!b) novos.push(t);
+    else if (b.chave !== t.chave || (b.lista || '') !== t.lista || (b.estados || '') !== t.estados || String(b.validade || '').slice(0, 10) !== t.validade) alterados.push(t);
+  }
+  const sumidos = noBanco.filter(t => usa(t) && !noPdf.has(t.codigo));
+  return { novos, alterados, sumidos };
+}
+
+if (typeof module !== 'undefined') module.exports = { numeroBR, textoBR, textoDescontos, chaveDescontos, lerDescontos, normalizarCodigo,
+  prefixoPadrao, clienteCombina, vencida, dataBR, resolverTabela, lerTabelasPdf, compararTabelas };
+
+/* ---------- tabelas de preço na Central: formulário, painel e banco ----------
+   A lista (código + descontos, por empresa) vem do banco depois do login e fica só na memória desta aba.
+   Conferir a tabela da cotação é feito aqui, no computador: nada da cotação é enviado.
+   O que vai para o banco é só a própria lista e o cliente que usa uma tabela fixa. */
+const Tabelas = (function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const NOME = { kos: 'KOS', godks: 'GODKS' };
+  const CAMPOS = 'empresa,codigo,descontos,lista,estados,validade,cliente';
+  let lista = null;             // null: não carregou; []: carregou e está vazia
+  let pronta = Promise.resolve();
+  let geracao = 0;
+  let painelEmp = 'kos', busca = '';
+
+  /* ---- carregar ---- */
+  function carregar() {
+    const minha = ++geracao;
+    pronta = Conta.todos(`tabelas_preco?select=${CAMPOS}&order=empresa,codigo`)
+      .then(r => {
+        if (minha !== geracao) return;
+        lista = (r || []).filter(t => NOME[t.empresa] && /^[A-Z]{3}-\d{3}$/.test(String(t.codigo)) && Array.isArray(t.descontos))
+          .map(t => ({ empresa: t.empresa, codigo: String(t.codigo), descontos: t.descontos.map(Number), chave: chaveDescontos(t.descontos),
+                       lista: t.lista || '', estados: t.estados || '', validade: t.validade || null, cliente: t.cliente || null }));
+      })
+      .catch(() => { if (minha === geracao) lista = null; });
+    return pronta;
+  }
+  function limpar() {
+    geracao++; lista = null; pronta = Promise.resolve(); dica('');
+    $('tab-painel').classList.remove('aberto');
+  }
+
+  /* ---- no formulário ---- */
+  const q = (campo, valor) => campo + '=eq.' + encodeURIComponent(valor);
+  const descricao = t => textoDescontos(t.descontos);
+  function dica(texto, alerta) {
+    const d = $('tabela_info'); if (!d) return;
+    d.textContent = texto || ''; d.title = texto || ''; d.classList.toggle('alerta', !!alerta);
+  }
+  function infoDe(t) {
+    const partes = [];
+    if (t.cliente) partes.push('só ' + t.cliente);
+    if (t.lista) partes.push('lista ' + t.lista);
+    if (t.validade) partes.push((vencida(t) ? 'VENCIDA em ' : 'vale até ') + dataBR(t.validade));
+    return partes.join(' · ');
+  }
+  function preencher(t, comDescricao) {
+    setAuto('tabela_codigo', t.codigo);
+    if (comDescricao) { setAuto('tabela', descricao(t)); $('tabela').classList.remove('faltando'); }
+    dica(infoDe(t), vencida(t));
+  }
+  const avisoVencida = t => vencida(t) ? ` Atenção: a tabela ${t.codigo} está vencida no ERP (validade ${dataBR(t.validade)}).` : '';
+
+  /* usado ao extrair a cotação: devolve o texto que entra no aviso da tela */
+  async function aplicar(empresa, d) {
+    dica('');
+    const codigo = d.tabela_codigo || null, cliente = d.cliente || '';
+    if (!codigo && !d.tabela && !cliente) return '';
+    await pronta;
+    if (!empresa) return '';
+    if (lista === null) return ' Não consegui carregar as tabelas de preço: confira a tabela à mão.';
+    /* sem descontos na cotação com código: todos 0% (a leitura da cotação deixa o campo vazio) */
+    const descontos = d.tabela ? lerDescontos(d.tabela) : (codigo ? [0] : null);
+    const nome = NOME[empresa], r = resolverTabela(lista, empresa, { codigo, descontos, cliente });
+    switch (r.tipo) {
+      case 'cliente':
+        preencher(r.tabela, true);
+        return ` Cliente ${r.tabela.cliente}: tabela ${r.tabela.codigo} (${descricao(r.tabela)})` +
+               (r.trocou ? `, no lugar da ${codigo} que veio na cotação.` : '.') + avisoVencida(r.tabela);
+      case 'codigo':
+        if (!r.confere) {
+          dica(`no cadastro: ${descricao(r.tabela)}`, true);
+          return ` Atenção: a cotação traz a tabela ${r.tabela.codigo} com ${textoDescontos(descontos)}, mas no cadastro a ${r.tabela.codigo} é ${descricao(r.tabela)}. Confira.`;
+        }
+        preencher(r.tabela, !$('tabela').value.trim());
+        return ` Tabela ${r.tabela.codigo} conferida (${descricao(r.tabela)}).` + avisoVencida(r.tabela);
+      case 'desconhecido':
+        dica(`${r.codigo} não está nas tabelas da ${nome}`, true);
+        return ` A tabela ${r.codigo} não está na lista de tabelas da ${nome}: confira.`;
+      case 'desconto':
+        preencher(r.tabela, false);
+        return ` Tabela ${descricao(r.tabela)}: código ${r.tabela.codigo}.` + avisoVencida(r.tabela);
+      case 'varios':
+        dica('pode ser ' + r.opcoes.map(t => t.codigo).join(' ou '), true);
+        return ` Há ${r.opcoes.length} tabelas com ${textoDescontos(descontos)} na ${nome} (${r.opcoes.map(t => t.codigo).join(', ')}): escolha o código à mão.`;
+      case 'nenhum':
+        return ` Não achei tabela com ${textoDescontos(descontos)} na ${nome}: preencha o código à mão.`;
+      case 'sem-lista':
+        return ` A lista de tabelas da ${nome} está vazia no banco. Use o botão Tabelas para carregar.`;
+      default: return '';
+    }
+  }
+
+  /* digitou o código: completa o desconto. Só o número (ex.: 5) usa o prefixo da empresa (KOS: JAN, GODKS: JUN). */
+  function aoDigitarCodigo() {
+    const campo = $('tabela_codigo'), texto = campo.value.trim();
+    if (!texto) { dica(''); return; }
+    if (!lista) { dica(lista === null ? 'tabelas não carregadas' : '', true); return; }
+    const pfx = prefixoPadrao(lista, empresaAtual), codigo = normalizarCodigo(texto, pfx);
+    if (!codigo) { dica(/^\d+$/.test(texto) ? 'digite com as letras (ex.: JAN-' + texto.padStart(3, '0') + ')' : 'código não reconhecido', true); return; }
+    campo.value = codigo;
+    const t = lista.find(x => x.empresa === empresaAtual && x.codigo === codigo);
+    if (!t) { dica(`${codigo} não está nas tabelas da ${NOME[empresaAtual]}`, true); return; }
+    setAuto('tabela', descricao(t)); $('tabela').classList.remove('faltando');
+    dica(infoDe(t), vencida(t));
+  }
+  /* digitou o desconto sem código: procura o código */
+  function aoDigitarDesconto() {
+    if ($('tabela_codigo').value.trim() || !lista) return;
+    const descontos = lerDescontos($('tabela').value);
+    if (!descontos) { dica(''); return; }
+    const r = resolverTabela(lista, empresaAtual, { descontos });
+    if (r.tipo === 'desconto') preencher(r.tabela, false);
+    else if (r.tipo === 'varios') dica('pode ser ' + r.opcoes.map(t => t.codigo).join(' ou '), true);
+    else if (r.tipo === 'nenhum') dica(`nenhuma tabela com ${textoDescontos(descontos)}`, true);
+  }
+  /* digitou o cliente: se ele tem tabela fixa e o código está vazio, preenche */
+  function aoDigitarCliente() {
+    if ($('tabela_codigo').value.trim() || !lista) return;
+    const r = resolverTabela(lista, empresaAtual, { cliente: $('cliente').value });
+    if (r.tipo === 'cliente') preencher(r.tabela, true);
+  }
+
+  /* ---- painel ---- */
+  const msg = (t, erro) => { const m = $('tab-msg'); m.textContent = t || ''; m.className = 'cond-msg' + (erro ? ' erro' : ''); };
+
+  function renderPainel() {
+    document.querySelectorAll('#tab-painel [data-emp]').forEach(b => b.classList.toggle('primary', b.dataset.emp === painelEmp));
+    const alvo = $('tab-lista'); alvo.textContent = '';
+    if (lista === null) { $('tab-sub').textContent = 'Não consegui carregar a lista. Feche e abra de novo, ou entre outra vez.'; return; }
+    const da = lista.filter(t => t.empresa === painelEmp), cont = new Map();
+    const grupo = t => t.chave + '|' + t.lista;   // mesmo desconto e mesma lista de preço
+    for (const t of da) if (!t.cliente) cont.set(grupo(t), (cont.get(grupo(t)) || 0) + 1);
+    const repetidas = da.filter(t => !t.cliente && cont.get(grupo(t)) > 1).length, vencidas = da.filter(t => vencida(t)).length;
+    $('tab-sub').textContent = da.length
+      ? `${da.length} tabelas na ${NOME[painelEmp]}.` + (repetidas ? ` ${repetidas} com o mesmo desconto de outra.` : '') +
+        (vencidas ? ` ${vencidas} ${vencidas > 1 ? 'vencidas' : 'vencida'}.` : '')
+      : `Nenhuma tabela da ${NOME[painelEmp]} no banco. Use "Atualizar pelo PDF do ERP" ou adicione abaixo.`;
+    const t0 = busca.trim().toLowerCase();
+    const vistas = da.filter(t => !t0 || t.codigo.toLowerCase().includes(t0) || descricao(t).toLowerCase().includes(t0) || (t.cliente || '').toLowerCase().includes(t0));
+    for (const t of vistas) {
+      const linha = document.createElement('div'); linha.className = 'cond-linha';
+      const cod = document.createElement('span'); cod.className = 'cond-c tab-c'; cod.textContent = t.codigo;
+      const ds = document.createElement('span'); ds.className = 'cond-p'; ds.textContent = descricao(t);
+      const ac = document.createElement('span'); ac.className = 'cond-a';
+      const tag = (texto, cls) => { const e = document.createElement('em'); e.textContent = texto; if (cls) e.className = cls; ac.appendChild(e); };
+      if (t.cliente) tag('só ' + t.cliente);
+      if (!t.cliente && cont.get(grupo(t)) > 1) tag('repetida', 'aviso');
+      if (vencida(t)) tag('vencida', 'aviso');
+      if (t.validade && !vencida(t)) { const s = document.createElement('small'); s.textContent = 'até ' + dataBR(t.validade); ac.appendChild(s); }
+      const bc = document.createElement('button'); bc.type = 'button'; bc.className = 'btn'; bc.textContent = 'Cliente';
+      bc.title = 'Cliente que usa sempre esta tabela'; bc.onclick = () => mudarCliente(t);
+      const ba = document.createElement('button'); ba.type = 'button'; ba.className = 'btn'; ba.textContent = 'Apagar';
+      ba.onclick = () => apagar(t);
+      ac.append(bc, ba); linha.append(cod, ds, ac); alvo.appendChild(linha);
+    }
+    if (!vistas.length && da.length) { const v = document.createElement('div'); v.className = 'cond-vazio'; v.textContent = 'Nada encontrado.'; alvo.appendChild(v); }
+  }
+
+  async function mudarCliente(t) {
+    const novo = prompt(`Cliente que usa SEMPRE a ${t.codigo} na ${NOME[t.empresa]}.\nBasta parte do nome. Deixe vazio para nenhum.`, t.cliente || '');
+    if (novo === null) return;
+    const valor = novo.trim().toUpperCase().slice(0, 80) || null;
+    if (valor && valor.replace(/[^A-Z0-9]/g, '').length < 3) { msg('Nome de cliente curto demais.', true); return; }
+    try {
+      await Conta.api(`tabelas_preco?${q('empresa', t.empresa)}&${q('codigo', t.codigo)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ cliente: valor, atualizado_em: new Date().toISOString() }) });
+      t.cliente = valor; msg(valor ? `${t.codigo} agora é a tabela fixa de ${valor}.` : `${t.codigo} não é mais tabela fixa de cliente.`);
+    } catch (e) { msg('Não consegui salvar: ' + e.message, true); }
+    renderPainel();
+  }
+
+  async function apagar(t) {
+    if (!confirm(`Apagar a tabela ${t.codigo} (${descricao(t)}) da ${NOME[t.empresa]}?\n\nIsso só tira da Central; no ERP ela continua.`)) return;
+    try {
+      await Conta.api(`tabelas_preco?${q('empresa', t.empresa)}&${q('codigo', t.codigo)}`, { method: 'DELETE' });
+      lista = lista.filter(x => x !== t); msg(`${t.codigo} apagada.`);
+    } catch (e) { msg('Não consegui apagar: ' + e.message, true); }
+    renderPainel();
+  }
+
+  async function adicionar(ev) {
+    ev.preventDefault();
+    if (lista === null) { msg('A lista não carregou. Feche e abra de novo.', true); return; }
+    const codigo = normalizarCodigo($('tab-novo-cod').value, null);
+    if (!codigo) { msg('Digite o código com as letras, por exemplo JAN-017.', true); $('tab-novo-cod').focus(); return; }
+    const lidos = lerDescontos($('tab-novo-desc').value);
+    if (!lidos) { msg('Digite os descontos, por exemplo 20 + 5 (até 5 descontos, de 0 a 100). Sem desconto: 0.', true); $('tab-novo-desc').focus(); return; }
+    const descontos = lidos.concat([0, 0, 0, 0, 0]).slice(0, 5);
+    const cliente = $('tab-novo-cli').value.trim().toUpperCase().slice(0, 80) || null;
+    const existe = lista.find(t => t.empresa === painelEmp && t.codigo === codigo);
+    if (existe && !confirm(`A ${codigo} já existe na ${NOME[painelEmp]} (${descricao(existe)}). Trocar por ${textoDescontos(descontos)}?`)) return;
+    const linha = { empresa: painelEmp, codigo, descontos, atualizado_em: new Date().toISOString() };
+    if (cliente) linha.cliente = cliente;
+    try {
+      await Conta.api('tabelas_preco', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([linha]) });
+      $('tab-novo-cod').value = $('tab-novo-desc').value = $('tab-novo-cli').value = '';
+      await carregar(); msg(`${codigo} (${textoDescontos(descontos)}) ${existe ? 'atualizada' : 'adicionada'} na ${NOME[painelEmp]}.`);
+    } catch (e) { msg('Não consegui salvar: ' + e.message, true); }
+    renderPainel();
+  }
+
+  function abrirPainel() {
+    if (!Conta.logado) return;
+    msg(''); busca = ''; $('tab-busca').value = ''; painelEmp = typeof empresaAtual === 'string' && NOME[empresaAtual] ? empresaAtual : 'kos';
+    $('tab-painel').classList.add('aberto'); renderPainel(); $('tab-busca').focus();
+    carregar().then(renderPainel);
+  }
+  const fecharPainel = () => $('tab-painel').classList.remove('aberto');
+
+  /* ---- atualizar pelo PDF do ERP (relatório FAT026 "TABELA DE PRECOS") ---- */
+  async function linhasDoPdf(file) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = getWorkerUrl();
+    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    let texto = '';
+    for (let i = 1; i <= pdf.numPages; i++) { const p = await pdf.getPage(i); texto += itemsParaTexto((await p.getTextContent()).items) + '\n'; }
+    return texto.split('\n');
+  }
+
+  async function atualizarPdf(file) {
+    const botao = $('tab-atualizar'); botao.disabled = true; msg('Lendo o PDF...');
+    try {
+      let linhas;
+      try { linhas = await linhasDoPdf(file); } catch (e) { msg('Não consegui ler esse PDF: ' + e.message, true); return; }
+      const r = lerTabelasPdf(linhas);
+      if (!r.ehLista) { msg('Esse PDF não parece a lista de tabelas de preço do ERP (relatório "TABELA DE PRECOS"). Nada foi alterado.', true); return; }
+      if (!r.empresa) { msg('Não achei a empresa (KOS ou GODKS) no cabeçalho do PDF. Nada foi alterado.', true); return; }
+      if (!r.itens.length) { msg('Não achei nenhuma tabela nesse PDF. Nada foi alterado.', true); return; }
+      await carregar(); if (lista === null) { msg('Não consegui ler a lista que está no banco. Nada foi alterado.', true); return; }
+      const nome = NOME[r.empresa], noBanco = lista.filter(t => t.empresa === r.empresa);
+      painelEmp = r.empresa; renderPainel();
+      const doPdf = [...new Set(r.itens.map(t => t.codigo.slice(0, 3)))];
+      let prefixos = [...new Set(noBanco.map(t => t.codigo.slice(0, 3)))].filter(p => doPdf.includes(p));
+      if (!prefixos.length) {
+        const resp = prompt(`O PDF da ${nome} tem as tabelas ${doPdf.join(', ')}.\nQuais vocês usam? (separe com vírgula)`, doPdf.join(', '));
+        if (resp === null) { msg('Nada foi alterado.'); return; }
+        prefixos = resp.toUpperCase().split(/[^A-Z]+/).filter(p => doPdf.includes(p));
+        if (!prefixos.length) { msg('Nenhuma dessas está no PDF. Nada foi alterado.', true); return; }
+      }
+      const d = compararTabelas(noBanco, r.itens, prefixos);
+      const mudou = d.novos.length + d.alterados.length + d.sumidos.length;
+      const fora = doPdf.filter(p => !prefixos.includes(p));
+      const obs = fora.length ? ` (as ${fora.join(', ')} ficam de fora: não são usadas)` : '';
+      if (!mudou) { msg(`Nada mudou: as tabelas ${prefixos.join(', ')} da ${nome} já estão iguais ao PDF${obs}.`); return; }
+      const nomes = l => l.length ? ': ' + l.slice(0, 12).map(t => t.codigo).join(', ') + (l.length > 12 ? '...' : '') : '';
+      const resumo = `${nome}, tabelas ${prefixos.join(', ')}${obs}.\nNovas: ${d.novos.length}${nomes(d.novos)}\nAlteradas: ${d.alterados.length}${nomes(d.alterados)}\n` +
+                     `Que saem da Central (não estão mais no ERP): ${d.sumidos.length}${nomes(d.sumidos)}`;
+      if (!confirm(resumo + '\n\nGravar no banco?')) { msg('Nada foi alterado.'); return; }
+      msg('Gravando...');
+      const agora = new Date().toISOString();
+      const grupo = [...d.novos, ...d.alterados].map(t => ({ empresa: r.empresa, codigo: t.codigo, descontos: t.descontos,
+        lista: t.lista, estados: t.estados, validade: t.validade, atualizado_em: agora }));   // sem "cliente": o que estava marcado continua
+      for (let i = 0; i < grupo.length; i += 200)
+        await Conta.api('tabelas_preco', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(grupo.slice(i, i + 200)) });
+      for (let i = 0; i < d.sumidos.length; i += 100)
+        await Conta.api(`tabelas_preco?${q('empresa', r.empresa)}&codigo=in.(${d.sumidos.slice(i, i + 100).map(t => encodeURIComponent(t.codigo)).join(',')})`, { method: 'DELETE' });
+      await carregar(); renderPainel();
+      msg(`Pronto. ${nome}: ${d.novos.length} novas, ${d.alterados.length} alteradas, ${d.sumidos.length} removidas.`);
+    } catch (e) {
+      msg('Não consegui gravar: ' + e.message + ' Confira a lista antes de continuar.', true); carregar().then(renderPainel);
+    } finally { botao.disabled = false; }
+  }
+
+  /* ---- ligações da tela ---- */
+  $('pt-tabelas').onclick = abrirPainel;
+  $('tab-fechar').onclick = fecharPainel;
+  $('tab-painel').addEventListener('click', e => { if (e.target === $('tab-painel')) fecharPainel(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('tab-painel').classList.contains('aberto')) fecharPainel(); });
+  document.querySelectorAll('#tab-painel [data-emp]').forEach(b => b.onclick = () => { painelEmp = b.dataset.emp; msg(''); renderPainel(); });
+  $('tab-busca').addEventListener('input', () => { busca = $('tab-busca').value; renderPainel(); });
+  $('tab-novo').onsubmit = adicionar;
+  $('tab-atualizar').onclick = () => $('tab-pdf').click();
+  $('tab-pdf').onchange = ev => { const f = ev.target.files[0]; ev.target.value = ''; if (f) atualizarPdf(f); };
+  $('tabela_codigo').addEventListener('change', aoDigitarCodigo);
+  $('tabela_codigo').addEventListener('input', () => { if (!$('tabela_codigo').value.trim()) dica(''); });
+  $('tabela').addEventListener('change', aoDigitarDesconto);
+  $('cliente').addEventListener('change', aoDigitarCliente);
+
+  return { carregar, limpar, aplicar, dica, abrirPainel, get lista() { return lista; } };
+})();
+</script>
 <script>
 /* ---------- portão da Central de Documentos ----------
    A página publicada não tem as logos nem a razão social das empresas. Depois
@@ -1994,10 +2439,11 @@ const Condicoes = (function () {
     switchTemplate(empresaAtual);
     el('pt-email').textContent = Conta.email || '';
     Condicoes.carregar();      // lista de condições de pagamento (não trava a Central se falhar)
+    Tabelas.carregar();        // lista de tabelas de preço (idem)
     tela(null);
   }
   function retirar() {
-    empresas = null; lidas = null; Condicoes.limpar();
+    empresas = null; lidas = null; Condicoes.limpar(); Tabelas.limpar();
     for (const e of ['kos', 'godks']) NOMES_EMPRESA[e] = '';
     document.querySelectorAll('img[data-logo]').forEach(i => i.removeAttribute('src'));
     el('if_empresa_nome').textContent = '';
