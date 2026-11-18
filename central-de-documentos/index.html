@@ -595,7 +595,7 @@
   <div class="app-bar-in">
     <div class="app-marca"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></div>
     <div class="app-nome">
-      <h2 class="app-title">Central de Documentos <span class="versao">v8</span></h2>
+      <h2 class="app-title">Central de Documentos <span class="versao">v9</span></h2>
       <p class="app-sub" id="app-sub">Liberação de Pedidos &middot; KOS / GODKS</p>
     </div>
     <div class="pt-conta">
@@ -1106,21 +1106,21 @@ function ligarFormatacoes(){
   }
 }
 
-// nome sugerido ao salvar em PDF da liberação: LIBERAÇÃO <CLIENTE> <Nº PEDIDO>
+// nome sugerido ao salvar em PDF da liberação: <EMPRESA> LIBERAÇÃO <CLIENTE> <Nº PEDIDO>
 function nomeArquivoLiberacao(){
   const cliente = document.getElementById('cliente').value.trim();
   const pedido  = document.getElementById('pedido_num').value.trim();
-  let nome = 'LIBERAÇÃO';
+  let nome = empresaAtual.toUpperCase() + ' LIBERAÇÃO';
   if(cliente) nome += ' ' + cliente;
   if(pedido)  nome += ' ' + pedido;
   return nome.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-// nome sugerido ao salvar em PDF: INSTRUCAO <CLIENTE> <DATA>
+// nome sugerido ao salvar em PDF: <EMPRESA> INSTRUÇÃO <CLIENTE> <DATA>
 function nomeArquivoInstrucao(){
   const cliente = document.getElementById('if_cliente').value.trim();
   const data    = document.getElementById('if_data').value.trim().replace(/\//g, '-');
-  let nome = 'INSTRUÇÃO';
+  let nome = empresaAtual.toUpperCase() + ' INSTRUÇÃO';
   if(cliente) nome += ' ' + cliente;
   if(data)    nome += ' ' + data;
   return nome.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
