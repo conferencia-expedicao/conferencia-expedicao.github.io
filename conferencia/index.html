@@ -275,6 +275,8 @@ dialog .conta-erro{padding:8px 22px 0;min-height:18px;color:var(--erro);font-siz
 }
 .aba-corpo .painel{border:0;box-shadow:none;padding:0}
 .aba-corpo .tit-painel{display:none}
+  .cartao .detalhe.fora{color:var(--tinta3)}
+  .veredito .digitei{margin-top:10px}
 </style>
 </head>
 <body>
@@ -284,7 +286,7 @@ dialog .conta-erro{padding:8px 22px 0;min-height:18px;color:var(--erro);font-siz
     <span class="logo" aria-hidden="true"></span>
     <div>
       <h1>Conferência de etiquetas</h1>
-      <span class="rota">GODKS &rarr; KOS · v5.4</span>
+      <span class="rota">GODKS &rarr; KOS · v5.5</span>
     </div>
   </div>
   <div class="dir">
@@ -1700,16 +1702,42 @@ function mostrarVeredito(r) {
       <span>quantidade <b>${num(et.qtd)}</b></span>
     </div>` : '';
   const avisos = (r.avisos || []).map(a => `<div class="aviso">${esc(a)}</div>`).join('');
+  const ultima = (conf.bipadas || [])[0];
+  const apagavel = r.titulo !== 'Etiqueta repetida' && ultima && podeApagar(ultima) && (!et.cod || ultima.cod === et.cod);
+  v.dataset.cod = apagavel ? ultima.cod : '';
   v.innerHTML = `
     <div class="titulo">${esc(r.titulo)}</div>
     ${r.nome ? `<div class="prod">${esc(r.nome)}</div>` : ''}
     <div class="det">${esc(r.detalhe)}</div>
-    ${campos}${avisos}`;
+    ${campos}${avisos}
+    ${apagavel ? `<div class="digitei"><button class="btn btn-min" id="bt-digitei">Digitei errado: apagar esta leitura</button></div>` : ''}`;
+  if (apagavel) $('bt-digitei').onclick = () => { const i = conf.bipadas.indexOf(ultima); if (i >= 0) apagarLeitura(i, true); };
 }
 
 function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* ---------------- leitura digitada errada ----------------
+   Leitura com erro (ou de período anterior) pode ser apagada: some da conferência como se não tivesse sido bipada. */
+function podeApagar(b) {
+  return !!b && (b.nivel === 'erro' || b.titulo === 'Etiqueta de período anterior') && !/^Transferência/.test(b.titulo || '');
+}
+async function apagarLeitura(i, semPerguntar) {
+  const b = conf.bipadas[i];
+  if (!podeApagar(b)) return;
+  if (!semPerguntar) {
+    const vai = await perguntar('Apagar esta leitura?',
+      `${b.titulo}: ${b.cod}. Ela sai da conferência como se não tivesse sido bipada. Depois é só bipar ou digitar a etiqueta certa.`,
+      [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Apagar a leitura', valor: true }]);
+    if (!vai) return;
+  }
+  conf.bipadas.splice(i, 1);
+  const v = $('veredito');
+  if (v && v.dataset.cod === b.cod) { v.className = 'veredito'; v.innerHTML = ''; delete v.dataset.cod; }
+  recalcularSituacao(conf); salvar(); render();
+  $('campo').focus({ preventScroll: true });
 }
 
 /* ---------------- resolver na mão ---------------- */
@@ -2102,10 +2130,22 @@ function precisaAcao(b) {
     (b.nivel === 'erro' || (b.nivel === 'atencao' && b.titulo !== 'Aguardando transferência'));
 }
 
+/* Apontamentos do relatório que têm uma leitura válida. Leitura com erro (número digitado errado,
+   produto fora do relatório, quantidade que não bate) ou repetida do mesmo apontamento não entra. */
+function apontamentosBipados() {
+  if (!rel) return 0;
+  const bipados = chavesBipadas();
+  let n = 0;
+  for (const [codigo, p] of rel.produtos) for (const ap of p.apontamentos) if (bipados.has(codigo + '|' + ap.doc)) n++;
+  return n;
+}
+
 function contagens() {
   const bip = conf.bipadas || [], pend = conf.pendencias || [];
+  const nBip = apontamentosBipados();
   return {
-    bip: bip.filter(b => b.produto).length, mao: conferidasAMao(), total: (conf.totais || {}).apontamentos || 0, lidas: bip.length,
+    bip: nBip, mao: conferidasAMao(), total: (conf.totais || {}).apontamentos || 0, lidas: bip.length,
+    foraConta: Math.max(0, bip.length - nBip),
     prob: bip.filter(precisaAcao).length + (conf.negativos || []).length,
     pend: pend.length, atrasadas: pend.filter(p => p.idade > PRAZO_NORMAL).length,
     faltam: semEtiqueta().length, faltamVelhas: semEtiqueta().filter(p => p.dias > DIAS_SEM_BIPAR).length
@@ -2190,7 +2230,8 @@ function renderCartoes() {
   $('cartoes').innerHTML =
     c('bipadas', 'Bipadas', `${num(n.bip + n.mao)}<small> de ${num(n.total)}</small>`,
       `<span class="barra" title="${pct}%"><i style="width:${pct}%"></i></span>` +
-      (n.mao ? `<span class="detalhe">${detalheFeitas(n)}</span>` : ''), '') +
+      (n.mao ? `<span class="detalhe">${detalheFeitas(n)}</span>` : '') +
+      (n.foraConta ? `<span class="detalhe fora">${num(n.foraConta)} ${n.foraConta === 1 ? 'leitura não entra' : 'leituras não entram'} na conta (com erro ou repetida)</span>` : ''), '') +
     c('problemas', 'Problemas', num(n.prob), n.prob ? s(n.prob, 'precisa de você', 'precisam de você') : 'nenhum',
       n.prob ? 'erro' : 'ok') +
     c('paradas', 'Transferências paradas', num(n.pend),
@@ -2222,7 +2263,8 @@ function itemBipada(b, i, total) {
       <span class="nm">${esc(b.nome || '—')}</span>
       <span class="vd">${esc(b.resolvida ? 'resolvida' : b.titulo)}${precisaAcao(b)
           ? (b.sugerePacote ? ` <button class="btn btn-min" data-pacote="${i}">É caixa de ${num(b.sugerePacote)}</button>` : '') +
-            ` <button class="btn btn-min" data-bip="${i}">Resolver</button>` : ''}</span>${motivoDe(b)}
+            ` <button class="btn btn-min" data-bip="${i}">Resolver</button>` : ''}${podeApagar(b)
+          ? ` <button class="btn btn-min" data-apagar-leitura="${i}" title="Apaga esta leitura da conferência">Digitei errado</button>` : ''}</span>${motivoDe(b)}
     </li>`;
 }
 
@@ -2420,6 +2462,7 @@ function renderListas() {
   /* ---- ações ---- */
   const area = document.querySelector('.listas');
   area.querySelectorAll('[data-bip]').forEach(b => b.onclick = () => resolverBipada(+b.dataset.bip));
+  area.querySelectorAll('[data-apagar-leitura]').forEach(b => b.onclick = () => apagarLeitura(+b.dataset.apagarLeitura));
   area.querySelectorAll('[data-pacote]').forEach(b => b.onclick = () => confirmarPacote(+b.dataset.pacote));
   area.querySelectorAll('[data-pend]').forEach(b => b.onclick = () => resolverPendencia(+b.dataset.pend));
   area.querySelectorAll('[data-neg]').forEach(b => b.onclick = () => ignorarNegativo(+b.dataset.neg));
@@ -2516,7 +2559,7 @@ window.addEventListener('focus', () => verificarLotes());
    não chegou na expedição, ou chegou e passou batido. */
 function chavesBipadas() {
   return new Set((conf.bipadas || [])
-    .filter(b => b.produto && b.doc && (!b.resolvida || b.nivel !== 'erro' || /^Transferência/.test(b.titulo || '')))
+    .filter(b => b.produto && b.doc && (b.nivel !== 'erro' || /^Transferência/.test(b.titulo || '')))
     .map(b => b.produto + '|' + b.doc));
 }
 
