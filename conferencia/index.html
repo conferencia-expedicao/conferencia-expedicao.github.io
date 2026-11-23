@@ -186,6 +186,12 @@ h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
 .bipadas li:last-child{border-bottom:0}
 .bipadas .motivo{flex-basis:100%;padding-left:20px;margin-top:-2px;font-size:12.5px;line-height:1.4;color:var(--tinta2)}
 .bipadas .motivo.atencao{color:var(--espera)} .bipadas .motivo.erro{color:var(--erro)}
+.bipadas .dados{flex-basis:100%;padding-left:20px;margin-top:4px;font-family:var(--mono);font-size:12.5px;
+                color:var(--tinta2);display:flex;gap:4px 16px;flex-wrap:wrap;align-items:baseline}
+.bipadas .dados b{color:var(--tinta);font-weight:600}
+.bipadas .dados .dif b{color:var(--erro)}
+.bipadas .dados .cod-cheio{color:var(--tinta3);display:inline-flex;gap:7px;align-items:baseline}
+.bipadas .dados .btn{padding:2px 8px;font-size:11.5px}
 .marca{width:9px;height:9px;border-radius:50%;flex:none;position:relative;top:1px}
 .marca.ok{background:var(--ok)} .marca.atencao{background:#E0A020} .marca.erro{background:var(--erro)}
 .bipadas .pos{font-family:var(--mono);font-size:12px;color:var(--tinta3);min-width:24px;text-align:right}
@@ -286,7 +292,7 @@ dialog .conta-erro{padding:8px 22px 0;min-height:18px;color:var(--erro);font-siz
     <span class="logo" aria-hidden="true"></span>
     <div>
       <h1>Conferência de etiquetas</h1>
-      <span class="rota">GODKS &rarr; KOS · v5.5</span>
+      <span class="rota">GODKS &rarr; KOS · v5.6</span>
     </div>
   </div>
   <div class="dir">
@@ -2255,6 +2261,41 @@ function motivoDe(b) {
   return t ? `<div class="motivo ${b.nivel}">${esc(t)}</div>` : '';
 }
 
+/* Linha com tudo da etiqueta: OP, produto, documento, quantidade, código completo e hora.
+   Quando o relatório tem o apontamento, mostra também o que o sistema diz (dia e quantidade). */
+function dadosDaEtiqueta(b) {
+  if (!b) return '';
+  const e = lerEtiqueta(b.cod || '');
+  const partes = [];
+  if (e.ok) {
+    partes.push(`<span>OP <b>${esc(e.op)}</b></span>`);
+    partes.push(`<span>produto <b>${esc(e.produto)}</b></span>`);
+    partes.push(`<span>doc <b>${esc(e.doc)}</b></span>`);
+    partes.push(`<span>etiqueta <b>${num(e.qtd)} pç</b></span>`);
+  }
+  const ap = acharApontamento(b);
+  if (ap) {
+    partes.push(`<span>sistema <b>${num(ap.qtd)} pç</b></span>`);
+    if (ap.dia) partes.push(`<span>dia <b>${esc(dm(ap))}</b></span>`);
+    if (ap.op && e.ok && ap.op !== e.op) partes.push(`<span class="dif">OP no sistema <b>${esc(ap.op)}</b></span>`);
+  }
+  if (b.quando) partes.push(`<span>bipada <b>${hora(b.quando)}</b></span>`);
+  const cod = `<span class="cod-cheio">${esc(b.cod || '')}` +
+    (b.cod ? ` <button class="btn btn-min" data-copiar-cod="${esc(b.cod)}">Copiar</button>` : '') + '</span>';
+  return `<div class="dados">${partes.join('')}${cod}</div>`;
+}
+
+/* O apontamento do relatório que corresponde a esta etiqueta, se existir. */
+function acharApontamento(b) {
+  if (!rel || !b || !b.produto || !b.doc) return null;
+  const p = rel.produtos.get(b.produto);
+  return p ? (p.apontamentos.find(a => a.doc === b.doc) || null) : null;
+}
+
+const hora = iso => { const d = new Date(iso); return isNaN(d) ? '' :
+  String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ' ' +
+  String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+
 function itemBipada(b, i, total) {
   return `<li>
       <span class="marca ${b.resolvida ? 'ok' : b.nivel}"></span>
@@ -2264,7 +2305,8 @@ function itemBipada(b, i, total) {
       <span class="vd">${esc(b.resolvida ? 'resolvida' : b.titulo)}${precisaAcao(b)
           ? (b.sugerePacote ? ` <button class="btn btn-min" data-pacote="${i}">É caixa de ${num(b.sugerePacote)}</button>` : '') +
             ` <button class="btn btn-min" data-bip="${i}">Resolver</button>` : ''}${podeApagar(b)
-          ? ` <button class="btn btn-min" data-apagar-leitura="${i}" title="Apaga esta leitura da conferência">Digitei errado</button>` : ''}</span>${motivoDe(b)}
+          ? ` <button class="btn btn-min" data-apagar-leitura="${i}" title="Apaga esta leitura da conferência">Digitei errado</button>` : ''}</span>${motivoDe(b)}${
+      b.nivel !== 'ok' || b.resolvida ? dadosDaEtiqueta(b) : ''}
     </li>`;
 }
 
@@ -2463,6 +2505,7 @@ function renderListas() {
   const area = document.querySelector('.listas');
   area.querySelectorAll('[data-bip]').forEach(b => b.onclick = () => resolverBipada(+b.dataset.bip));
   area.querySelectorAll('[data-apagar-leitura]').forEach(b => b.onclick = () => apagarLeitura(+b.dataset.apagarLeitura));
+  area.querySelectorAll('[data-copiar-cod]').forEach(b => b.onclick = () => copiar(b.dataset.copiarCod, b));
   area.querySelectorAll('[data-pacote]').forEach(b => b.onclick = () => confirmarPacote(+b.dataset.pacote));
   area.querySelectorAll('[data-pend]').forEach(b => b.onclick = () => resolverPendencia(+b.dataset.pend));
   area.querySelectorAll('[data-neg]').forEach(b => b.onclick = () => ignorarNegativo(+b.dataset.neg));
