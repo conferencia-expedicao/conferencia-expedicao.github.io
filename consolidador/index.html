@@ -230,8 +230,8 @@ tr.novo td{background:#fffbe8 !important}
 .etq-prev{width:300px;flex-shrink:0}
 .etq-prev h3{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#666;margin:0 0 8px}
 .etq-prev p{font-size:12px;color:#666;margin:8px 0 0;line-height:1.5}
-.etq-lbl{background:#fff;border:2px solid var(--ink);display:flex;flex-direction:column;
-  align-items:center;justify-content:center;overflow:hidden}
+.etq-lbl{background:#fff;border:2px solid var(--ink);box-sizing:content-box;overflow:hidden}
+.etq-lbl svg{display:block}
 .etq-lbl b{font-family:var(--sans);font-weight:800;line-height:1;letter-spacing:-.02em}
 .etq-lbl span{font-family:var(--sans);opacity:.75;margin-top:6px;text-align:center;padding:0 6px}
 #tblEtq input[type=number]{width:78px;font-family:var(--mono);font-size:12.5px;font-weight:600;
@@ -555,7 +555,7 @@ body.travado #nv-portao{display:flex}
   <div class="nv-topo">
     <div class="app-marca"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5-9 4.5z"/><path d="M3 7.5v9L12 21l9-4.5v-9"/><path d="M12 12v9"/></svg></div>
     <div>
-      <h1>Consolidador de Ordens de Separação <span class="nv-versao">v2</span></h1>
+      <h1>Consolidador de Ordens de Separação <span class="nv-versao">v3</span></h1>
       <p>Junta itens repetidos entre várias OS &middot; soma peças e caixas &middot; gera a folha de separação e conferência</p>
     </div>
     <div class="nv-conta">
@@ -681,7 +681,9 @@ body.travado #nv-portao{display:flex}
       <option value="num">só o número</option>
     </select></label>
     <label>Ajuste vertical<input type="number" id="etqDy" value="0" step="1"
-           title="Sobe ou desce o texto, em pontos"></label>
+           title="Sobe ou desce o texto, em pontos (positivo desce)"></label>
+    <label>Ajuste horizontal<input type="number" id="etqDx" value="0" step="1"
+           title="Anda o texto para os lados, em pontos (positivo vai para a direita)"></label>
     <label class="etq-chk"><input type="checkbox" id="etqDesc"> Incluir descrição em corpo pequeno</label>
     <label class="etq-chk"><input type="checkbox" id="etqAgr"> Agrupar etiquetas de mesma quantidade</label>
   </div>
@@ -1525,6 +1527,75 @@ function montarImpressao(itens, ordens, envPcs, envCxs, pedPcs, parcial){
   document.getElementById("print").innerHTML = h;
 }
 
+/* ---------------- layout da etiqueta (navegador): número grande, centralizado pelo desenho real das letras ---------------- */
+var ETQ_FONTE = 'system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
+var _cvEtq = null;
+/* mede o desenho (tinta) do texto por 1 unidade de corpo: largura, altura acima e abaixo da linha */
+function medirTinta(txt, peso){
+  try {
+    if (!_cvEtq) _cvEtq = document.createElement("canvas").getContext("2d");
+    _cvEtq.font = peso + " 100px " + ETQ_FONTE;
+    var m = _cvEtq.measureText(txt);
+    if (m.actualBoundingBoxAscent != null && m.width > 0)
+      return { larg: m.width / 100, asc: m.actualBoundingBoxAscent / 100, desc: m.actualBoundingBoxDescent / 100 };
+  } catch (e) {}
+  return { larg: txt.length * 0.6, asc: 0.72, desc: txt.indexOf("Ç") >= 0 ? 0.2 : 0.02 };   // sem medida: estimativa
+}
+
+/* quebra a descrição em até 2 linhas que caibam na largura */
+function quebrarDesc(txt, fDesc, largMax){
+  var palavras = String(txt).split(/\s+/).filter(Boolean), linhas = [""], i;
+  for (i = 0; i < palavras.length; i++){
+    var tent = linhas[linhas.length - 1] ? linhas[linhas.length - 1] + " " + palavras[i] : palavras[i];
+    if (medirTinta(tent, 600).larg * fDesc <= largMax || !linhas[linhas.length - 1]) linhas[linhas.length - 1] = tent;
+    else if (linhas.length < 2) linhas.push(palavras[i]);
+    else { linhas[1] += "…"; break; }
+  }
+  return linhas;
+}
+
+/* devolve o desenho da etiqueta em SVG, nas unidades W x H (mm na impressão, pixels na prévia) */
+function svgEtq(cap, desc, c, W, H, tam){
+  var unidade = c.modo === "pecas" ? "PEÇAS" : (c.modo === "pcs" ? "PÇS" : "");
+  var num = String(cap);
+  var temDesc = !!(c.desc && desc);
+  var mmPorPt = 25.4 / c.dpi, u = W / c.larguraMm;                    // unidades por mm
+  var dx = (c.dx || 0) * mmPorPt * u, dy = (c.dy || 0) * mmPorPt * u;   // ajustes (pontos -> unidades)
+
+  var fN = H * (temDesc ? 0.50 : (unidade ? 0.74 : 0.90));
+  var mN = medirTinta(num, 800);
+  fN = Math.min(fN, (W * 0.90) / mN.larg);
+  var fU = 0, mU = null;
+  if (unidade){ mU = medirTinta(unidade, 800); fU = Math.min(fN * 0.30, (W * 0.90) / mU.larg); }
+  var fD = temDesc ? H * 0.075 : 0, linhasD = temDesc ? quebrarDesc(desc, fD, W * 0.90) : [];
+  var gap1 = H * 0.06, gap2 = H * 0.05, lh = fD * 1.2;
+
+  function altura(k){
+    var t = mN.asc * fN * k;
+    if (unidade) t += gap1 * k + (mU.asc + mU.desc) * fU * k;
+    if (temDesc) t += gap2 * k + (linhasD.length - 1) * lh * k + 0.95 * fD * k;
+    return t;
+  }
+  var k = 1, total = altura(1);
+  if (total > H * 0.88){ k = (H * 0.88) / total; total = H * 0.88; }
+  fN *= k; fU *= k; fD *= k; gap1 *= k; gap2 *= k; lh *= k;
+
+  var y = (H - total) / 2 + dy, cx = W / 2 + dx, out = "";
+  function texto(t, y0, f, peso, op){
+    return '<text x="' + cx.toFixed(2) + '" y="' + y0.toFixed(2) + '" font-size="' + f.toFixed(2) + '" font-weight="' + peso +
+           '" text-anchor="middle" fill="#000"' + (op ? ' fill-opacity="' + op + '"' : '') + '>' + esc(t) + '</text>';
+  }
+  out += texto(num, y + mN.asc * fN, fN, 800);
+  y += mN.asc * fN;
+  if (unidade){ y += gap1 + mU.asc * fU; out += texto(unidade, y, fU, 800); y += mU.desc * fU; }
+  if (temDesc){
+    y += gap2 + 0.75 * fD;
+    linhasD.forEach(function(l, i){ out += texto(l, y + i * lh, fD, 600, 0.8); });
+  }
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W.toFixed(2) + ' ' + H.toFixed(2) + '" width="' + (tam ? tam.w : W.toFixed(2)) +
+         '" height="' + (tam ? tam.h : H.toFixed(2)) + '" style="display:block;font-family:' + ETQ_FONTE.replace(/"/g, "'") + '">' + out + '</svg>';
+}
+
 /* ---------------- etiquetas Zebra ---------------- */
 function cfgEtq(){
   var dpi = parseInt(document.getElementById("etqDpi").value, 10) || 203;
@@ -1537,6 +1608,7 @@ function cfgEtq(){
     h: Math.round((parseFloat(document.getElementById("etqA").value) || 50) * pmm),
     modo: document.getElementById("etqTxt").value,
     dy: parseInt(document.getElementById("etqDy").value, 10) || 0,
+    dx: parseInt(document.getElementById("etqDx").value, 10) || 0,
     desc: document.getElementById("etqDesc").checked
   };
 }
@@ -1638,15 +1710,9 @@ function renderEtiquetas(){
   var escala = larguraPrev / c.larguraMm;
   var alturaPrev = Math.round(c.alturaMm * escala);
   var exemplo = itens.filter(function(i){ return !STATE.etqFora[i.cod]; })[0] || itens[0];
-  var txt = textoEtq(exemplo.cap, c.modo);
-  var corpo = Math.min(alturaPrev * (c.desc ? 0.40 : 0.58),
-                       (larguraPrev * 0.92) / (txt.length * 0.62));
   document.getElementById("etqPreview").innerHTML =
     '<div class="etq-lbl" style="width:' + larguraPrev + 'px;height:' + alturaPrev + 'px">' +
-    '<b style="font-size:' + Math.round(corpo) + 'px;padding-bottom:' + Math.round(corpo*0.18) + 'px">' + esc(txt) + '</b>' +
-    (c.desc ? '<span style="font-size:' + Math.max(9, Math.round(alturaPrev*0.09)) +
-              'px;margin-top:' + Math.round(corpo*0.14) + 'px">' +
-              esc(exemplo.desc) + '</span>' : '') + '</div>';
+    svgEtq(exemplo.cap, exemplo.desc, c, larguraPrev, alturaPrev, { w: larguraPrev, h: alturaPrev }) + '</div>';
 
   var ativos = itens.filter(function(i){ return !STATE.etqFora[i.cod]; });
   var capsDist = {};
@@ -1724,16 +1790,9 @@ function atualizarAvulso(){
   var larguraPrev = 220;
   var escala = larguraPrev / c.larguraMm;
   var alturaPrev = Math.round(c.alturaMm * escala);
-  var txt = textoEtq(item.cap, c.modo);
-  var corpo = Math.min(alturaPrev * (c.desc ? 0.40 : 0.58),
-                       (larguraPrev * 0.92) / (txt.length * 0.62));
   prevEl.innerHTML =
     '<div class="etq-lbl" style="width:' + larguraPrev + 'px;height:' + alturaPrev + 'px">' +
-    '<b style="font-size:' + Math.round(corpo) + 'px;padding-bottom:' + Math.round(corpo*0.18) + 'px">' +
-    esc(txt) + '</b>' +
-    (c.desc ? '<span style="font-size:' + Math.max(9, Math.round(alturaPrev*0.09)) +
-              'px;margin-top:' + Math.round(corpo*0.14) + 'px">' + esc(item.desc) + '</span>' : '') +
-    '</div>';
+    svgEtq(item.cap, item.desc, c, larguraPrev, alturaPrev, { w: larguraPrev, h: alturaPrev }) + '</div>';
   return item;
 }
 
@@ -1798,20 +1857,9 @@ function imprimirListaEtq(lista, c, avisoOrigem){
   var alvo = document.getElementById("printEtq");
   var html = "";
   lista.forEach(function(x){
-    var txt = textoEtq(x.cap, c.modo);
-    var corpo = Math.min(c.alturaMm * (c.desc ? 0.38 : 0.56),
-                         (c.larguraMm * 0.92) / (txt.length * 0.62));
-    var desloc = c.dy ? (c.dy / (c.dpi / 25.4)) : 0;  // pontos -> mm
+    var desenho = svgEtq(x.cap, x.desc, c, c.larguraMm, c.alturaMm, { w: c.larguraMm + "mm", h: c.alturaMm + "mm" });
     for (var n = 0; n < x.qtd; n++){
-      html += '<div class="etq-pag" style="width:' + c.larguraMm + 'mm;height:' + c.alturaMm +
-              'mm;padding-top:' + desloc.toFixed(2) + 'mm">' +
-              '<b style="font-size:' + corpo.toFixed(2) + 'mm;padding-bottom:' + (corpo*0.18).toFixed(2) + 'mm">' +
-              esc(txt) + '</b>' +
-              (c.desc && x.desc
-                ? '<span style="font-size:' + (c.alturaMm * 0.09).toFixed(2) + 'mm;margin-top:' +
-                  (corpo * 0.14).toFixed(2) + 'mm">' + esc(x.desc) + '</span>'
-                : '') +
-              '</div>';
+      html += '<div class="etq-pag" style="width:' + c.larguraMm + 'mm;height:' + c.alturaMm + 'mm">' + desenho + '</div>';
     }
   });
   alvo.innerHTML = html;
@@ -2281,7 +2329,7 @@ document.getElementById("btnFull").addEventListener("click", function(){
 });
 
 /* ---- etiquetas: botões ---- */
-["etqL","etqA","etqDpi","etqTxt","etqDy","etqDesc","etqAgr"].forEach(function(id){
+["etqL","etqA","etqDpi","etqTxt","etqDy","etqDx","etqDesc","etqAgr"].forEach(function(id){
   var el = document.getElementById(id);
   el.addEventListener("change", function(){ renderEtiquetas(); atualizarAvulso(); });
   el.addEventListener("input", function(){ renderEtiquetas(); atualizarAvulso(); });
