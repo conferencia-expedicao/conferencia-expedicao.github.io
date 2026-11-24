@@ -1,0 +1,2652 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consolidador de Ordens de Separação</title>
+<meta name="description" content="Ferramenta interna para consolidar ordens de separação, calcular peças e caixas, gerar a folha de conferência e as etiquetas de caixa.">
+<meta name="theme-color" content="#1f3864">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%231f3864'/%3E%3Cpath d='M6 11h20v3H6zm0 6h20v3H6zm0 6h13v3H6z' fill='%23ffe08a'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+        crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+<style>
+:root{
+  --ink:#12161f;
+  --steel:#1f3864;
+  --steel-2:#2f4d80;
+  --paper:#f3f1ec;
+  --card:#ffffff;
+  --line:#c9c6bd;
+  --amber:#ffe08a;
+  --amber-ink:#7a5200;
+  --alert:#b00020;
+  --ok:#166b46;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.45;
+}
+
+/* ---------- cabeçalho ---------- */
+.topbar{
+  background:var(--steel);
+  color:#fff;
+  padding:18px 24px;
+  border-bottom:4px solid var(--ink);
+}
+.topbar h1{
+  margin:0;
+  font-size:19px;
+  font-weight:700;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+.topbar p{margin:4px 0 0;font-size:12.5px;opacity:.8;font-family:var(--mono)}
+
+.wrap{max-width:1400px;margin:0 auto;padding:24px}
+
+/* ---------- abas ---------- */
+.tabs{
+  display:flex;gap:2px;background:var(--ink);padding:0 24px;
+  max-width:1400px;margin:0 auto;overflow-x:auto;
+}
+.tab{
+  font-family:var(--sans);font-size:13.5px;font-weight:600;color:#b9c2d6;
+  background:transparent;border:none;padding:13px 20px;cursor:pointer;
+  border-bottom:3px solid transparent;white-space:nowrap;
+}
+.tab:hover{color:#fff;background:rgba(255,255,255,.06)}
+.tab[aria-selected="true"]{color:#fff;border-bottom-color:var(--amber);background:rgba(255,255,255,.04)}
+.tab:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
+.tab-badge{
+  display:inline-block;background:var(--amber);color:var(--amber-ink);font-size:10.5px;
+  font-weight:700;border-radius:9px;padding:1px 7px;margin-left:5px;
+}
+.painel[hidden]{display:none}
+
+/* ---------- entrada ---------- */
+.intake{
+  display:grid;
+  grid-template-columns:1.6fr 1fr;
+  gap:16px;
+  margin-bottom:22px;
+}
+@media(max-width:820px){.intake{grid-template-columns:1fr}}
+
+.drop{
+  background:var(--card);
+  border:2px dashed var(--line);
+  border-radius:3px;
+  padding:26px 22px;
+  text-align:center;
+  cursor:pointer;
+  transition:border-color .15s, background .15s;
+}
+.drop:hover,.drop.hot{border-color:var(--steel);background:#fbfaf7}
+.drop:focus-visible{outline:3px solid var(--steel);outline-offset:2px}
+.drop strong{display:block;font-size:16px;margin-bottom:5px}
+.drop span{font-size:13px;color:#5c5c5c}
+
+.side{background:var(--card);border:1px solid var(--line);border-radius:3px;padding:18px}
+.side h2{margin:0 0 8px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:#666}
+.side p{margin:0 0 12px;font-size:13px;color:#555}
+.side label{display:inline-block}
+
+.btn{
+  font-family:var(--sans);
+  font-size:13.5px;
+  font-weight:600;
+  padding:9px 16px;
+  border:1px solid var(--ink);
+  border-radius:2px;
+  background:var(--ink);
+  color:#fff;
+  cursor:pointer;
+}
+.btn:hover{background:#000}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.ghost:hover{background:#e9e6df}
+.btn:focus-visible{outline:3px solid var(--steel);outline-offset:2px}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+
+textarea{
+  width:100%;height:110px;font-family:var(--mono);font-size:12px;
+  border:1px solid var(--line);border-radius:2px;padding:8px;resize:vertical;
+}
+
+/* ---------- painel de totais ---------- */
+.totals{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+  border:2px solid var(--ink);background:var(--card);margin-bottom:20px;
+}
+@media(max-width:700px){.totals{grid-template-columns:repeat(2,1fr)}}
+.tot{padding:14px 18px;border-right:1px solid var(--line)}
+.tot:last-child{border-right:0}
+.tot b{display:block;font-family:var(--mono);font-size:30px;line-height:1.1;font-weight:700}
+.tot span{display:block;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#666;margin-top:2px}
+.tot.hi{background:var(--amber)}
+.tot.hi span{color:var(--amber-ink)}
+
+/* ---------- avisos ---------- */
+.notice{border-left:4px solid;padding:11px 14px;margin-bottom:14px;font-size:13.5px;background:var(--card)}
+.notice.err{border-color:var(--alert);background:#fff5f5}
+.notice.ok{border-color:var(--ok);background:#f3faf6}
+.notice.warn{border-color:#c98a00;background:#fffaf0}
+.notice ul{margin:6px 0 0;padding-left:18px}
+
+/* ---------- tabela ---------- */
+.tablewrap{background:var(--card);border:1px solid var(--line);overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+thead th{
+  background:var(--steel);color:#fff;font-size:10.5px;letter-spacing:.05em;
+  text-transform:uppercase;padding:9px 8px;text-align:left;white-space:nowrap;
+  position:sticky;top:0;
+}
+tbody td{padding:7px 8px;border-bottom:1px solid #e5e2da;vertical-align:middle}
+tbody tr:nth-child(even){background:#f7f6f2}
+.code{font-family:var(--mono);font-size:12.5px;font-weight:600;white-space:nowrap}
+.num{text-align:right;font-family:var(--mono);font-weight:600;white-space:nowrap}
+.cap{text-align:center;font-family:var(--mono)}
+tfoot td{background:#dde3f0;font-weight:700;padding:10px 8px;border-top:2px solid var(--ink)}
+tfoot td.num{background:var(--amber)}
+
+.orders{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-family:var(--mono);font-size:12px;border:1px solid var(--line);background:var(--card);padding:4px 8px;border-radius:2px}
+.chip i{font-style:normal;color:#888}
+
+.empty{text-align:center;padding:60px 20px;color:#888;font-size:14px}
+
+/* edição de quantidades */
+input.qtd{
+  width:62px;font-family:var(--mono);font-size:12.5px;font-weight:600;text-align:right;
+  padding:4px 6px;border:1px solid var(--line);border-radius:2px;background:#fffdf2;
+}
+input.qtd:focus{outline:2px solid var(--steel);outline-offset:1px;border-color:var(--steel)}
+input.qtd.cortado{border-color:#c98a00;background:#fff3d6;color:#7a5200}
+input.qtd.zerado{border-color:var(--alert);background:#ffecec;color:var(--alert)}
+input.capin{width:48px;text-align:center;font-family:var(--mono);font-size:12.5px;font-weight:600;
+  padding:4px;border:1px solid var(--line);border-radius:2px;background:#fffdf2}
+input.capin.falta{border-color:var(--alert);background:#ffecec}
+input.capin:focus{outline:2px solid var(--steel);outline-offset:1px}
+tr.off td{opacity:.42}
+tr.off td:first-child{text-decoration:line-through}
+.saldo{font-family:var(--mono);font-size:12px;color:#c98a00;font-weight:600}
+.saldo.zero{color:#bbb;font-weight:400}
+.chip.btn-ord{cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:6px}
+.chip.btn-ord:hover{border-color:var(--steel)}
+.chip.btn-ord.fora{background:#f0eeea;color:#aaa;text-decoration:line-through;border-style:dashed}
+.chip.btn-ord input{margin:0;cursor:pointer}
+
+#cadastro{margin-top:38px;border-top:3px solid var(--ink);padding-top:18px}
+.cad-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.cad-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#cadBusca{padding:8px 10px;border:1px solid var(--line);border-radius:2px;font-size:13px;min-width:190px}
+#cadBusca:focus{outline:2px solid var(--steel);outline-offset:1px}
+#tblCad input{
+  width:100%;font-family:var(--mono);font-size:12.5px;padding:5px 6px;
+  border:1px solid transparent;border-radius:2px;background:transparent;
+}
+#tblCad input:hover{border-color:var(--line);background:#fffdf2}
+#tblCad input:focus{outline:2px solid var(--steel);outline-offset:0;background:#fff;border-color:var(--steel)}
+#tblCad input.txt{font-family:var(--sans);font-size:13px}
+#tblCad input.ctr{text-align:center;font-weight:600}
+#tblCad input.vazio{background:#ffecec;border-color:var(--alert)}
+.del{
+  border:1px solid var(--line);background:transparent;color:#999;cursor:pointer;
+  border-radius:2px;padding:3px 8px;font-size:13px;line-height:1.2;
+}
+.del:hover{border-color:var(--alert);color:var(--alert);background:#fff5f5}
+tr.novo td{background:#fffbe8 !important}
+
+#etiquetas{margin-top:38px;border-top:3px solid var(--ink);padding-top:18px}
+.etq-cfg{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;
+  background:var(--card);border:1px solid var(--line);padding:14px 16px;margin-bottom:14px}
+.etq-cfg label{display:flex;flex-direction:column;gap:4px;font-size:11px;
+  letter-spacing:.06em;text-transform:uppercase;color:#666}
+.etq-cfg input,.etq-cfg select{
+  font-family:var(--mono);font-size:13px;padding:6px 8px;border:1px solid var(--line);
+  border-radius:2px;width:100px;text-transform:none;letter-spacing:0;color:var(--ink)}
+.etq-cfg select{width:130px;font-family:var(--sans)}
+.etq-cfg input:focus,.etq-cfg select:focus{outline:2px solid var(--steel);outline-offset:1px}
+.etq-cfg label.etq-chk{flex-direction:row;align-items:center;gap:7px;text-transform:none;
+  font-size:13px;letter-spacing:0;color:var(--ink);padding-bottom:7px}
+.etq-cfg label.etq-chk input{width:auto}
+.etq-corpo{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.etq-prev{width:300px;flex-shrink:0}
+.etq-prev h3{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#666;margin:0 0 8px}
+.etq-prev p{font-size:12px;color:#666;margin:8px 0 0;line-height:1.5}
+.etq-lbl{background:#fff;border:2px solid var(--ink);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;overflow:hidden}
+.etq-lbl b{font-family:var(--sans);font-weight:800;line-height:1;letter-spacing:-.02em}
+.etq-lbl span{font-family:var(--sans);opacity:.75;margin-top:6px;text-align:center;padding:0 6px}
+#tblEtq input[type=number]{width:78px;font-family:var(--mono);font-size:12.5px;font-weight:600;
+  text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:2px;background:#fffdf2}
+#tblEtq input[type=checkbox]{cursor:pointer}
+#tblEtq tr.off td{opacity:.4}
+
+.etq-selecao{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.etq-marcar-todos{
+  display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600;
+  cursor:pointer;user-select:none;
+}
+.etq-marcar-todos input{cursor:pointer}
+.etq-sel-resumo{font-size:12.5px;color:#666}
+
+.etq-avulso{
+  margin-top:18px;background:var(--card);border:1px solid var(--line);
+  border-left:4px solid var(--steel);padding:14px 16px;
+}
+.etq-avulso-linha{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+.etq-avulso-linha label{
+  display:flex;flex-direction:column;gap:4px;font-size:11px;letter-spacing:.06em;
+  text-transform:uppercase;color:#666;
+}
+.etq-avulso-linha input{
+  font-family:var(--sans);font-size:13px;padding:7px 9px;border:1px solid var(--line);
+  border-radius:2px;text-transform:none;letter-spacing:0;color:var(--ink);
+}
+#etqAvCod{width:220px}
+#etqAvQtd{width:90px;font-family:var(--mono);text-align:right}
+.etq-avulso-linha input:focus{outline:2px solid var(--steel);outline-offset:1px}
+.etq-av-nome{
+  font-size:13.5px;color:var(--ink);padding-bottom:8px;max-width:320px;
+}
+.etq-av-nome.achou{font-weight:600}
+.etq-av-nome.nao-achou{color:#999;font-style:italic}
+.etq-avulso-prev{margin-top:12px}
+.etq-avulso-prev:empty{display:none}
+h2.sec{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#666;margin:26px 0 8px}
+
+/* ---------- impressão ---------- */
+#print{display:none}
+#printEtq{display:none}
+.etq-pag{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;overflow:hidden;box-sizing:border-box;
+}
+.etq-pag b{font-family:var(--sans);font-weight:800;line-height:1;letter-spacing:-.02em;color:#000}
+.etq-pag span{font-family:var(--sans);line-height:1.15;color:#000}
+/* ---------- login e topo (versão web) ---------- */
+body.travado > *:not(#nv-portao){display:none !important}
+#nv-portao{display:none;min-height:100vh;align-items:center;justify-content:center;padding:24px 16px}
+body.travado #nv-portao{display:flex}
+.nv-card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-top:6px solid var(--steel);padding:24px 26px}
+.nv-card h2{margin:0 0 4px;font-size:17px;letter-spacing:.05em;text-transform:uppercase;color:var(--steel)}
+.nv-texto{margin:0 0 14px;font-size:13.5px;color:#555}
+.nv-card input{display:block;width:100%;margin:0 0 10px;padding:10px 12px;border:1px solid var(--line);font:inherit;font-size:15px;border-radius:2px}
+.nv-card input:focus{outline:2px solid var(--steel);outline-offset:1px}
+.nv-erro{min-height:18px;color:var(--alert);font-size:13px;margin:0 0 8px}
+.nv-acoes{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+.nv-link{background:none;border:0;padding:0;color:#555;text-decoration:underline;cursor:pointer;font:inherit;font-size:13px;margin-right:auto}
+.nv-topo{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.nv-versao{font-size:.62em;font-weight:400;letter-spacing:0;opacity:.7;text-transform:none}
+.nv-conta{margin-left:auto;display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:12.5px;font-family:var(--mono)}
+.nv-btn{background:transparent;border:1px solid rgba(255,255,255,.55);color:#fff;padding:5px 12px;font:inherit;font-size:12.5px;
+        cursor:pointer;text-decoration:none;border-radius:2px}
+.nv-btn:hover{background:rgba(255,255,255,.14)}
+.nv-estado:empty{display:none}
+.nv-estado{padding:2px 8px;border-radius:2px;background:rgba(255,255,255,.14)}
+.nv-estado.ok{background:#e6f4ec;color:var(--ok)}
+.nv-estado.erro{background:#fde8e8;color:var(--alert);cursor:pointer}
+.nv-nota{font-size:12.5px;color:#555;align-self:center}
+@media print{
+  @page{size:A4 landscape;margin:9mm}
+
+  /* modo etiqueta: só as páginas de etiqueta saem, no tamanho do rolo */
+  body.modo-etq #print{display:none !important}
+  body.modo-etq #printEtq{display:block}
+  body.modo-etq .etq-pag{break-after:page;page-break-after:always}
+  body.modo-etq .etq-pag:last-child{break-after:auto;page-break-after:auto}
+  body{background:#fff;font-size:9pt}
+  .noprint{display:none !important}
+  #print{display:block}
+  .p-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:9px}
+  .p-head h1,.p-head h2{margin:0;font-size:15pt;letter-spacing:.02em;font-weight:700}
+  .p-head div{font-size:8pt;text-align:right;line-height:1.5}
+  #print table{width:100%;border-collapse:collapse;font-size:7.2pt}
+  #print th{background:#1f3864 !important;color:#fff !important;border:.5pt solid #666;padding:3pt;font-size:6.6pt;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print td{border:.5pt solid #888;padding:2.2pt 3pt;word-wrap:break-word}
+  #print table.compacta{font-size:6.6pt}
+  #print table.compacta td{padding:1.6pt 2.5pt}
+  #print table.compacta th{font-size:6pt;padding:2.4pt}
+  #print tbody tr:nth-child(even){background:#f0f2f7 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print .fill{background:#fffdf2 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print tfoot td{background:#dde3f0 !important;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print tfoot td.big{background:#ffe08a !important}
+  .p-parcial{border:1.2pt solid #c98a00;background:#fff3d6 !important;padding:4pt 8pt;margin-bottom:5pt;
+    font-size:8pt;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print td.corte{background:#fff3d6 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .p-alert{border:.8pt solid #b00020;background:#fff5f5 !important;padding:3.5pt 6pt;margin-top:5pt;font-size:6pt;line-height:1.3;page-break-inside:avoid;break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .p-sign{display:flex;margin-top:7pt;border:.8pt solid #000;page-break-inside:avoid;break-inside:avoid}
+  .p-sign div{flex:1;border-right:.8pt solid #000;padding:5pt 8pt;font-size:7pt;min-height:38pt}
+  .p-sign div:last-child{border-right:0;background:#ffe08a !important;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .p-line{display:block;margin-top:14pt;border-top:.6pt solid #000;width:85%}
+  .p-orders{page-break-before:always;break-before:page}
+  #print .code{font-family:var(--mono);font-weight:600}
+}
+</style>
+</head>
+<body class="travado">
+
+<div id="nv-portao">
+  <form class="nv-card" id="nv-entrar">
+    <h2>Consolidador de Ordens</h2>
+    <p class="nv-texto" id="nv-entrar-texto">Entre com o e-mail de trabalho. É o mesmo login da Conferência e da Central.</p>
+    <input id="nv-email-in" type="email" autocomplete="username" placeholder="e-mail de trabalho" required aria-label="E-mail">
+    <input id="nv-senha-in" type="password" autocomplete="current-password" placeholder="senha" required aria-label="Senha">
+    <div class="nv-erro" id="nv-entrar-erro"></div>
+    <div class="nv-acoes">
+      <button type="button" class="nv-link" id="nv-esqueci">Esqueci a senha</button>
+      <button type="submit" class="btn" id="nv-bt-entrar">Entrar</button>
+    </div>
+  </form>
+  <form class="nv-card" id="nv-nova" style="display:none">
+    <h2>Senha nova</h2>
+    <p class="nv-texto">Escolha a senha nova, com pelo menos 8 caracteres. Ela vale em todos os apps.</p>
+    <input id="nv-nova-senha" type="password" autocomplete="new-password" placeholder="senha nova" minlength="8" required aria-label="Senha nova">
+    <input id="nv-nova-senha2" type="password" autocomplete="new-password" placeholder="repita a senha nova" minlength="8" required aria-label="Repita a senha nova">
+    <div class="nv-erro" id="nv-nova-erro"></div>
+    <div class="nv-acoes"><button type="submit" class="btn" id="nv-bt-nova">Salvar a senha</button></div>
+  </form>
+  <div class="nv-card" id="nv-aguarde" style="display:none">
+    <h2>Consolidador de Ordens</h2>
+    <p class="nv-texto" id="nv-aguarde-texto">Carregando...</p>
+    <div class="nv-acoes" id="nv-aguarde-acoes" style="display:none">
+      <button type="button" class="nv-link" id="nv-aguarde-sair">Sair</button>
+      <button type="button" class="btn" id="nv-de-novo">Tentar de novo</button>
+    </div>
+  </div>
+</div>
+
+<header class="topbar noprint">
+  <div class="nv-topo">
+    <div>
+      <h1>Consolidador de Ordens de Separação <span class="nv-versao">v1</span></h1>
+      <p>Junta itens repetidos entre várias OS &middot; soma peças e caixas &middot; gera a folha de separação e conferência</p>
+    </div>
+    <div class="nv-conta">
+      <span id="nv-estado" class="nv-estado" role="status"></span>
+      <span id="nv-email"></span>
+      <a class="nv-btn" href="../inicio/" title="Todos os apps">Início</a>
+      <button class="nv-btn" id="nv-sair" type="button">Sair</button>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs noprint" role="tablist" aria-label="Seções do app">
+  <button class="tab" data-tab="consolidar" role="tab" aria-selected="true">Consolidar</button>
+  <button class="tab" data-tab="etiquetas" role="tab" aria-selected="false">Etiquetas</button>
+  <button class="tab" data-tab="cadastro" role="tab" aria-selected="false">Cadastro <span id="tabCadCount" class="tab-badge"></span></button>
+</nav>
+
+<main class="wrap noprint">
+
+  <div id="painelConsolidar" class="painel">
+  <div class="intake">
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Selecionar arquivos PDF das ordens de separação">
+      <strong>Solte os PDFs das ordens de separação aqui</strong>
+      <span>ou clique para escolher os arquivos &middot; pode mandar vários de uma vez</span>
+      <input type="file" id="pdfs" accept=".pdf" multiple hidden>
+    </div>
+
+    <div class="side">
+      <h2>CSV do cliente</h2>
+      <p>Com as OS carregadas, serve de conferência. Sem nenhuma OS, o consolidado é montado direto do CSV.</p>
+      <label class="btn ghost" for="csv">Carregar CSV do cliente</label>
+      <input type="file" id="csv" accept=".csv,.txt" hidden>
+      <div id="csvinfo" style="font-size:12.5px;color:#555;margin-top:10px"></div>
+      <div id="csvcliente" style="margin-top:12px;display:none">
+        <label for="nomeCliente" style="font-size:12px;color:#666;display:block;margin-bottom:4px">Nome do cliente para o cabeçalho</label>
+        <input type="text" id="nomeCliente" autocomplete="organization" placeholder="ex.: NOME DO CLIENTE S.A."
+               style="width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:2px;font-size:13px">
+      </div>
+    </div>
+  </div>
+
+  <details style="margin-bottom:20px">
+    <summary style="cursor:pointer;font-size:13px;color:#555">Sem leitor de PDF? Cole o texto das ordens aqui</summary>
+    <textarea id="paste" aria-label="Texto das ordens de separação" placeholder="Cole o conteúdo das ordens de separação..."></textarea>
+    <button class="btn ghost" id="btnPaste" style="margin-top:8px">Processar texto colado</button>
+  </details>
+
+  <div id="status"></div>
+
+  <div id="result" style="display:none">
+    <div class="totals">
+      <div class="tot"><b id="tItens">0</b><span>Itens distintos</span></div>
+      <div class="tot"><b id="tPedidos">0</b><span>Ordens consolidadas</span></div>
+      <div class="tot"><b id="tPecas">0</b><span id="lPecas">Peças a enviar</span></div>
+      <div class="tot hi"><b id="tCaixas">0</b><span>Caixas a enviar</span></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" id="btnPrint">Imprimir folha de separação</button>
+      <button class="btn ghost" id="btnCsv">Exportar CSV</button>
+      <button class="btn ghost" id="btnSalvarCons">Salvar consolidação</button>
+      <label class="btn ghost" for="abrirCons" style="margin:0">Abrir consolidação</label>
+      <input type="file" id="abrirCons" accept=".json" hidden>
+      <button class="btn ghost" id="btnFull">Enviar tudo</button>
+      <button class="btn ghost" id="btnClear">Limpar</button>
+    </div>
+
+    <div id="alerts"></div>
+
+    <div class="tablewrap">
+      <table id="tbl">
+        <thead><tr>
+          <th>Cód. interno</th><th>Nossa descrição</th><th>Cód. cliente</th>
+          <th class="alfa">Alfa</th><th class="alfa">Descrição cliente</th>
+          <th style="text-align:center">Cap. cx</th>
+          <th style="text-align:right">Pedido<br>peças</th>
+          <th style="text-align:right">Enviar<br>caixas</th>
+          <th style="text-align:right">Enviar<br>peças</th>
+          <th style="text-align:right">Saldo</th>
+          <th style="text-align:center">Ordens</th>
+        </tr></thead>
+        <tbody></tbody>
+        <tfoot></tfoot>
+      </table>
+    </div>
+
+    <h2 class="sec">Ordens da remessa <span style="text-transform:none;letter-spacing:0;font-weight:400">— desmarque para tirar a ordem inteira do consolidado</span></h2>
+    <div id="avisoVolumes"></div>
+    <div class="tablewrap">
+      <table id="tblOrdens">
+        <thead><tr>
+          <th style="width:44px"></th>
+          <th style="width:110px">Nº pedido</th>
+          <th style="width:90px">Nº O.S.</th>
+          <th style="width:80px;text-align:right">Itens<br>distintos</th>
+          <th style="width:110px;text-align:right">Peças</th>
+          <th style="width:130px;text-align:right">Volumes (caixas)</th>
+          <th></th>
+        </tr></thead>
+        <tbody></tbody>
+        <tfoot></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="empty" id="empty">Nenhuma ordem carregada ainda.</div>
+  </div><!-- /#painelConsolidar -->
+
+  <div id="painelEtiquetas" class="painel" hidden>
+  <div class="empty" id="etqVazio" style="padding:24px 20px">Consolide uma OS ou um CSV para gerar etiquetas em lote. A etiqueta avulsa, logo abaixo, funciona mesmo sem isso.</div>
+
+  <div class="etq-cfg">
+    <label>Largura (mm)<input type="number" id="etqL" value="100" min="10" max="300" step="1"></label>
+    <label>Altura (mm)<input type="number" id="etqA" value="60" min="10" max="300" step="1"></label>
+    <label>Resolução<select id="etqDpi">
+      <option value="203">203 dpi</option>
+      <option value="300">300 dpi</option>
+    </select></label>
+    <label>Texto<select id="etqTxt">
+      <option value="pcs">12 PÇS</option>
+      <option value="pecas">12 PEÇAS</option>
+      <option value="num">só o número</option>
+    </select></label>
+    <label>Ajuste vertical<input type="number" id="etqDy" value="0" step="1"
+           title="Sobe ou desce o texto, em pontos"></label>
+    <label class="etq-chk"><input type="checkbox" id="etqDesc"> Incluir descrição em corpo pequeno</label>
+    <label class="etq-chk"><input type="checkbox" id="etqAgr"> Agrupar etiquetas de mesma quantidade</label>
+  </div>
+  <p style="font-size:12px;color:#888;margin:2px 0 0">
+    Essa configuração vale tanto para o lote consolidado abaixo quanto para a etiqueta avulsa.
+  </p>
+
+  <section id="etiquetas" style="display:none">
+    <div class="cad-head">
+      <div>
+        <h2 class="sec" style="margin:0">Etiquetas de caixa (Zebra)</h2>
+        <p style="margin:3px 0 0;font-size:13px;color:#555">
+          Uma etiqueta por caixa, com a quantidade de peças em corpo grande.
+          Gera o código ZPL nativo da impressora.
+        </p>
+      </div>
+      <div class="cad-acoes">
+        <button class="btn" id="btnEtqImprimir">Imprimir etiquetas</button>
+        <button class="btn ghost" id="btnEtqTeste">Etiqueta de teste</button>
+        <button class="btn ghost" id="btnEtqCopiar">Copiar ZPL</button>
+        <button class="btn ghost" id="btnEtqBaixar">Baixar ZPL</button>
+      </div>
+    </div>
+
+    <div class="etq-selecao">
+      <label class="etq-marcar-todos">
+        <input type="checkbox" id="chkEtqTodos" checked>
+        Marcar todos
+      </label>
+      <span id="etqSelResumo" class="etq-sel-resumo"></span>
+    </div>
+
+    <div class="etq-corpo">
+      <div class="tablewrap" style="flex:1">
+        <table id="tblEtq">
+          <thead><tr>
+            <th style="width:44px"></th>
+            <th>Item</th>
+            <th style="width:90px;text-align:center">Pçs/cx</th>
+            <th style="width:110px;text-align:right">Caixas</th>
+            <th style="width:110px;text-align:right">Etiquetas</th>
+          </tr></thead>
+          <tbody></tbody>
+          <tfoot></tfoot>
+        </table>
+      </div>
+      <div class="etq-prev">
+        <h3>Prévia</h3>
+        <div id="etqPreview"></div>
+        <p id="etqInfo"></p>
+      </div>
+    </div>
+
+  </section>
+
+  <div class="etq-avulso">
+    <h3 class="sec" style="margin:0 0 4px">Etiqueta avulsa</h3>
+    <p style="margin:0 0 10px;font-size:13px;color:#555">
+      Digite o código do cliente ou o código interno do item. Sem precisar consolidar
+      nenhuma OS antes.
+    </p>
+    <div class="etq-avulso-linha">
+      <label>Código do item<br>
+        <input type="text" id="etqAvCod" placeholder="Ex.: 1234567890 ou 0001234500" autocomplete="off">
+      </label>
+      <span id="etqAvNome" class="etq-av-nome"></span>
+      <label>Quantidade<br>
+        <input type="number" id="etqAvQtd" min="1" step="1" value="1">
+      </label>
+      <button class="btn" id="btnEtqAvImprimir">Imprimir</button>
+      <button class="btn ghost" id="btnEtqAvZpl">Baixar ZPL</button>
+    </div>
+    <div class="etq-avulso-prev">
+      <div id="etqAvPreview"></div>
+    </div>
+    <p id="etqAvInfo" style="font-size:12.5px;color:#666;margin-top:8px"></p>
+  </div>
+
+  <details style="margin-top:14px">
+    <summary style="cursor:pointer;font-size:13px;color:#555">Como mandar o arquivo para a Zebra</summary>
+    <div style="font-size:13px;color:#444;line-height:1.6;margin-top:8px">
+      O arquivo .zpl vai direto para a impressora, sem abrir em nenhum programa.
+      No Windows, com a Zebra compartilhada na rede ou instalada como porta local, abra o
+      Prompt de Comando e rode:<br>
+      <code style="display:inline-block;background:#eee;padding:4px 8px;margin-top:6px;font-size:12.5px">
+      copy /b etiquetas.zpl \\localhost\NOME_DA_IMPRESSORA</code><br>
+      Trocando NOME_DA_IMPRESSORA pelo nome do compartilhamento.
+      Alternativa sem linha de comando: o Zebra Setup Utilities tem a opção
+      "Enviar arquivo para a impressora".
+      <b>Sempre teste com o botão "Etiqueta de teste" antes de mandar o lote inteiro.</b>
+    </div>
+  </details>
+  </div><!-- /#painelEtiquetas -->
+
+  <div id="painelCadastro" class="painel" hidden>
+  <section id="cadastro">
+    <div class="cad-head">
+      <div>
+        <h2 class="sec" style="margin:0">Cadastro de produtos</h2>
+        <p style="margin:3px 0 0;font-size:13px;color:#555">
+          De-para do código do cliente para o nosso, com as peças por caixa.
+          É daqui que saem as caixas quando o consolidado vem só do CSV.
+        </p>
+      </div>
+      <div class="cad-acoes">
+        <input type="search" id="cadBusca" placeholder="Buscar código ou descrição"
+               aria-label="Buscar no cadastro">
+        <button class="btn ghost" id="btnCadNovo">+ Novo item</button>
+        <button class="btn ghost" id="btnCadOut2">Salvar em arquivo</button>
+        <label class="btn ghost" for="cadIn2" style="margin:0">Carregar arquivo</label>
+        <input type="file" id="cadIn2" accept=".json" hidden>
+        <span class="nv-nota">O cadastro é salvo sozinho no banco e vale em qualquer computador.</span>
+      </div>
+    </div>
+    <details id="cadImport" style="margin-bottom:14px">
+      <summary style="cursor:pointer;font-size:13px;color:#555;font-weight:600">
+        Importar vários itens de uma vez (colar da planilha)
+      </summary>
+      <div style="background:var(--card);border:1px solid var(--line);padding:14px 16px;margin-top:8px">
+        <p style="margin:0 0 8px;font-size:13px;color:#555">
+          No Excel, monte quatro colunas nesta ordem e copie as linhas:
+          <b>código do cliente &nbsp;|&nbsp; código interno &nbsp;|&nbsp; descrição &nbsp;|&nbsp; peças por caixa</b>.
+          Linha de cabeçalho é ignorada. Item já existente é atualizado.
+        </p>
+        <textarea id="cadCola" aria-label="Linhas do cadastro coladas da planilha" style="height:130px"
+          placeholder="1234567890&#9;0001234500&#9;DESCRIÇÃO DO ITEM&#9;12&#10;1234567891&#9;0001234600&#9;OUTRO ITEM&#9;6"></textarea>
+        <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn" id="btnCadCola">Importar linhas coladas</button>
+          <label class="btn ghost" for="cadCsvIn" style="margin:0">Importar arquivo CSV</label>
+          <input type="file" id="cadCsvIn" accept=".csv,.txt,.tsv" hidden>
+          <button class="btn ghost" id="btnCadCsvOut">Exportar para Excel (CSV)</button>
+        </div>
+        <div id="cadImpRes" style="margin-top:10px"></div>
+      </div>
+    </details>
+
+    <div id="cadAviso"></div>
+    <div class="tablewrap">
+      <table id="tblCad">
+        <thead><tr>
+          <th style="width:150px">Cód. cliente</th>
+          <th style="width:150px">Cód. interno</th>
+          <th>Descrição</th>
+          <th style="width:110px;text-align:center">Peças/caixa</th>
+          <th style="width:60px"></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p id="cadResumo" style="font-size:12.5px;color:#666;margin-top:8px"></p>
+  </section>
+  </div><!-- /#painelCadastro -->
+
+</main>
+
+<!-- ================= layout de impressão ================= -->
+<div id="print"></div>
+<div id="printEtq" aria-hidden="true"></div>
+<style id="etqPage"></style>
+
+<script>
+var PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+function prepararPdfJs(){
+  if (!window.pdfjsLib) return false;
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc)
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+  return true;
+}
+
+/* de-para código do cliente -> nosso código, descrição e capacidade da caixa.
+   O app aprende sozinho a cada OS lida; dá para salvar e recarregar em arquivo. */
+var CADASTRO_BASE = {
+};   // vem do banco depois do login (tabela consolidador_cadastro)
+
+function novoEstado(){
+  return { ordens:[], csv:null, fora:{}, cortes:{}, calc:null,
+           origem:"os", cliente:"", etqFora:{}, etqQtd:{},
+           cadastro:JSON.parse(JSON.stringify(CADASTRO_BASE)) };
+}
+var STATE = novoEstado();
+
+/* aprende o de-para a partir das ordens lidas do PDF */
+function aprenderCadastro(ordens){
+  var novos = 0;
+  ordens.forEach(function(o){
+    o.itens.forEach(function(i){
+      var c = STATE.cadastro[i.codCli];
+      if (!c) novos++;
+      if (!c || c.cap !== i.cap || c.cod !== i.cod)
+        STATE.cadastro[i.codCli] = { cod:i.cod, desc:i.desc, cap:i.cap };
+    });
+  });
+  return novos;
+}
+
+/* monta ordens a partir do CSV do cliente, usando o cadastro para código e capacidade */
+function ordensDoCSV(csv){
+  var porPedido = {};
+  Object.keys(csv.itens).forEach(function(codCli){
+    var ext = csv.itens[codCli];
+    var cad = STATE.cadastro[codCli];
+    Object.keys(ext.porPedido).forEach(function(ped){
+      if (!porPedido[ped])
+        porPedido[ped] = { os:"—", codcli:"", cliente:STATE.cliente, pedido:ped, itens:[] };
+      var pcs = ext.porPedido[ped];
+      var cap = cad ? cad.cap : 0;
+      porPedido[ped].itens.push({
+        cod:    cad ? cad.cod : "?" + codCli,
+        pcs:    pcs,
+        codCli: codCli,
+        desc:   cad ? cad.desc : (ext.desc || codCli),
+        cxs:    cap ? pcs / cap : 0,
+        cap:    cap
+      });
+    });
+  });
+  return Object.keys(porPedido).sort().map(function(k){ return porPedido[k]; });
+}
+
+/* ---------------- extração de texto do PDF ---------------- */
+async function pdfParaLinhas(file){
+  if (!prepararPdfJs()) throw new Error("leitor de PDF não carregou");
+  var buf = await file.arrayBuffer();
+  var doc = await pdfjsLib.getDocument({ data: buf }).promise;
+  var linhas = [];
+  for (var p = 1; p <= doc.numPages; p++){
+    var page = await doc.getPage(p);
+    var tc = await page.getTextContent();
+    var porY = {};
+    tc.items.forEach(function(it){
+      var y = Math.round(it.transform[5]);
+      // tolera 1px de diferença de baseline
+      var chave = porY[y] !== undefined ? y : (porY[y-1] !== undefined ? y-1 : (porY[y+1] !== undefined ? y+1 : y));
+      if (!porY[chave]) porY[chave] = [];
+      porY[chave].push({ x: it.transform[4], s: it.str });
+    });
+    Object.keys(porY)
+      .sort(function(a,b){ return b - a; })
+      .forEach(function(y){
+        var txt = porY[y].sort(function(a,b){ return a.x - b.x; })
+                         .map(function(o){ return o.s; }).join(" ");
+        txt = txt.replace(/\s+/g," ").trim();
+        if (txt) linhas.push(txt);
+      });
+  }
+  return linhas;
+}
+
+/* ---------------- interpretação das linhas ---------------- */
+var RE_ITEM  = /^(\d{10})[_\s]+([\d.,]+)\s+(\d{6,12})\s*-\s*(.+?)\s+(\d+)\s+(\d+)$/;
+var RE_OS    = /^(\d{6})\s+(\d{6})\s+([A-ZÀ-Ú].+)$/;
+var RE_PEDIDO= /PEDIDO:?\s*(\d{6,9})/i;
+
+function interpretar(linhas){
+  var ordens = [], atual = null;
+  linhas.forEach(function(l){
+    var m;
+    if ((m = l.match(RE_ITEM))){
+      if (!atual){ atual = { os:"?", cliente:"", pedido:"", itens:[] }; ordens.push(atual); }
+      atual.itens.push({
+        cod:  m[1],
+        pcs:  parseFloat(m[2].replace(/\./g,"").replace(",",".")),
+        codCli: m[3],
+        desc: m[4].trim(),
+        cxs:  parseInt(m[5],10),
+        cap:  parseInt(m[6],10)
+      });
+      return;
+    }
+    if ((m = l.match(RE_OS)) && !/PEDIDO|CODCLI/.test(l)){
+      atual = { os:m[1], codcli:m[2], cliente:m[3].trim(), pedido:"", itens:[] };
+      ordens.push(atual);
+      return;
+    }
+    if (atual && !atual.pedido && (m = l.match(RE_PEDIDO))) atual.pedido = m[1];
+  });
+  return ordens.filter(function(o){ return o.itens.length; });
+}
+
+function consolidar(ordens){
+  var mapa = {};
+  ordens.forEach(function(o){
+    o.itens.forEach(function(i){
+      var k = i.cod;
+      if (!mapa[k]) mapa[k] = { cod:k, desc:i.desc, codCli:i.codCli, cap:i.cap, pcs:0, cxs:0, ordens:0, capVaria:false };
+      if (mapa[k].cap !== i.cap) mapa[k].capVaria = true;
+      mapa[k].pcs += i.pcs;
+      mapa[k].cxs += i.cxs;
+      mapa[k].ordens++;
+    });
+  });
+  return Object.keys(mapa).sort().map(function(k){ return mapa[k]; });
+}
+
+function validar(itens){
+  var probs = [];
+  itens.forEach(function(i){
+    if (i.capVaria) probs.push("Capacidade por caixa inconsistente para " + i.cod + " (" + i.desc + ") entre as ordens.");
+    var esperado = (i.pcsPedido !== undefined ? i.pcsPedido : i.pcs) / i.cap;
+    if (Math.abs(esperado - i.cxs) > 0.001){
+      probs.push(i.cod + " — " + i.desc + ": " + fmt(i.pcsPedido !== undefined ? i.pcsPedido : i.pcs) + " pçs ÷ " + i.cap +
+                 " = " + esperado.toFixed(2) + " cx, mas a soma das ordens dá " +
+                 (i.cxsPedido !== undefined ? i.cxsPedido : i.cxs) + " cx.");
+    }
+  });
+  return probs;
+}
+
+/* ---------------- CSV do cliente ---------------- */
+function lerCSV(texto){
+  texto = texto.replace(/^\uFEFF/,"");
+  var linhas = texto.split(/\r?\n/).filter(function(l){ return l.trim(); });
+  if (!linhas.length) return null;
+  var sep = (linhas[0].match(/;/g)||[]).length >= (linhas[0].match(/,/g)||[]).length ? ";" : ",";
+  var cabec = linhas[0].split(sep).map(limpa);
+  var chave = function(c){
+    return c.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z]/g,"");
+  };
+  var idx = function(nome){
+    return cabec.findIndex(function(c){ return chave(c).indexOf(nome) === 0; });
+  };
+  var iCod = idx("cod"), iAlfa = idx("alfa"), iDesc = idx("nprod"), iQtd = idx("qtd"), iPed = idx("nped");
+  if (iCod < 0 || iQtd < 0) return null;
+  var dados = {};
+  var pedidos = {};
+  for (var i=1;i<linhas.length;i++){
+    var c = linhas[i].split(sep).map(limpa);
+    var cod = c[iCod];
+    if (!cod) continue;
+    if (!dados[cod]) dados[cod] = { qtd:0, alfa:c[iAlfa]||"", desc:c[iDesc]||"", porPedido:{} };
+    var q = parseFloat((c[iQtd]||"0").replace(",", ".")) || 0;
+    dados[cod].qtd += q;
+    if (iPed >= 0 && c[iPed]){
+      pedidos[c[iPed]] = true;
+      dados[cod].porPedido[c[iPed]] = (dados[cod].porPedido[c[iPed]] || 0) + q;
+    }
+  }
+  return { itens:dados, pedidos:Object.keys(pedidos), pedidosSet:pedidos };
+}
+function limpa(s){ return (s||"").trim().replace(/^"|"$/g,"").trim(); }
+
+/* ---------------- render ---------------- */
+function fmt(n){
+  return (Math.round(n*100)/100).toLocaleString("pt-BR");
+}
+function chaveOrdem(o){ return o.os + "|" + o.pedido; }
+
+/* aplica exclusões de ordens e cortes de quantidade */
+function calcular(){
+  var ordens = STATE.ordens.filter(function(o){ return !STATE.fora[chaveOrdem(o)]; });
+  var itens = consolidar(ordens);
+  itens.forEach(function(i){
+    i.pcsPedido = i.pcs;
+    i.cxsPedido = i.cxs;
+    var aj = STATE.cortes[i.cod];
+    i.envPcs = (aj === undefined ? i.pcsPedido : Math.max(0, Math.min(aj, i.pcsPedido)));
+    i.envCxs = i.cap ? i.envPcs / i.cap : 0;
+    i.cxsFisicas = i.cap ? Math.ceil(i.envCxs - 0.0001) : 0;
+    i.fracionada = i.cap ? Math.abs(i.envCxs - Math.round(i.envCxs)) > 0.0001 : false;
+    i.saldo = i.pcsPedido - i.envPcs;
+  });
+  return { ordens: ordens, itens: itens };
+}
+
+/* peças e volumes (caixas físicas) de uma ordem, contando pelas linhas dela */
+function volumesOrdem(o){
+  var pcs = 0, cxs = 0, frac = false;
+  o.itens.forEach(function(i){
+    pcs += i.pcs;
+    // na OS a coluna QT.CX já traz a caixa; vindo do CSV, calcula pela capacidade
+    var c = (i.cxs && i.cxs > 0) ? i.cxs : (i.cap ? i.pcs / i.cap : 0);
+    if (Math.abs(c - Math.round(c)) > 0.0001) frac = true;
+    cxs += Math.ceil(c - 0.0001);
+  });
+  return { itens: o.itens.length, pcs: pcs, cxs: cxs, frac: frac };
+}
+
+function ehParcial(d){
+  return d.itens.some(function(i){ return i.saldo > 0.0001; }) ||
+         Object.keys(STATE.fora).some(function(k){ return STATE.fora[k]; });
+}
+
+function render(){
+  if (!STATE.ordens.length) return;
+  var d = calcular();
+  var itens = d.itens, ordens = d.ordens;
+  STATE.calc = d;
+
+  var envPcs  = itens.reduce(function(s,i){ return s + i.envPcs; }, 0);
+  var envCxs  = itens.reduce(function(s,i){ return s + i.cxsFisicas; }, 0);
+  var pedPcs  = itens.reduce(function(s,i){ return s + i.pcsPedido; }, 0);
+  var ativos  = itens.filter(function(i){ return i.envPcs > 0; }).length;
+  var parcial = ehParcial(d);
+
+  document.getElementById("empty").style.display = "none";
+  document.getElementById("result").style.display = "block";
+  document.getElementById("tItens").textContent   = ativos;
+  document.getElementById("tPedidos").textContent = ordens.length;
+  document.getElementById("tPecas").textContent   = fmt(envPcs);
+  document.getElementById("tCaixas").textContent  = fmt(envCxs);
+  document.getElementById("lPecas").textContent   =
+    parcial ? "Peças a enviar (de " + fmt(pedPcs) + ")" : "Peças a enviar";
+
+  var faltaCap = itens.some(function(i){ return !i.cap && i.envPcs > 0; });
+  var travar = envPcs === 0 || faltaCap;
+  document.getElementById("btnPrint").disabled = travar;
+  document.getElementById("btnCsv").disabled   = travar;
+
+  var temCsv = !!STATE.csv;
+  document.querySelectorAll(".alfa").forEach(function(el){ el.style.display = temCsv ? "" : "none"; });
+
+  var editavelCap = STATE.origem === "csv";
+  var tb = document.querySelector("#tbl tbody"); tb.innerHTML = "";
+  itens.forEach(function(i){
+    var ext = temCsv ? (STATE.csv.itens[i.codCli] || null) : null;
+    var tr = document.createElement("tr");
+    if (i.envPcs === 0) tr.className = "off";
+    var cls = i.envPcs === 0 ? "zerado" : (i.saldo > 0 ? "cortado" : "");
+    var cxVal = Math.round(i.envCxs * 100) / 100;
+    tr.innerHTML =
+      '<td class="code">' + esc(i.cod) + '</td>' +
+      '<td>' + esc(i.desc) + '</td>' +
+      '<td class="code">' + esc(i.codCli) + '</td>' +
+      (temCsv ? '<td class="alfa code">' + esc(ext ? ext.alfa : "—") + '</td>' +
+                '<td class="alfa">' + esc(ext ? ext.desc : "não consta no CSV") + '</td>' : "") +
+      '<td class="cap">' + (editavelCap
+          ? '<input class="capin ' + (i.cap ? "" : "falta") + '" type="number" min="0" step="1" ' +
+            'data-capcod="' + esc(i.codCli) + '" value="' + (i.cap || "") + '" ' +
+            'aria-label="Peças por caixa de ' + esc(i.desc) + '">'
+          : i.cap) + '</td>' +
+      '<td class="num">' + fmt(i.pcsPedido) + '<br><span style="font-weight:400;color:#888">' +
+        (i.cap ? fmt(i.cxsPedido) + ' cx' : 'cap. ?') + '</span></td>' +
+      '<td class="num"><input class="qtd ' + cls + '" type="number" min="0" step="1" ' +
+        'data-cod="' + esc(i.cod) + '" data-modo="cx" value="' + cxVal + '"' +
+        ' aria-label="Caixas a enviar de ' + esc(i.desc) + '"></td>' +
+      '<td class="num"><input class="qtd ' + cls + '" type="number" min="0" step="1" ' +
+        'data-cod="' + esc(i.cod) + '" data-modo="pc" value="' + i.envPcs + '"' +
+        ' aria-label="Peças a enviar de ' + esc(i.desc) + '"></td>' +
+      '<td class="num"><span class="saldo ' + (i.saldo > 0 ? "" : "zero") + '">' +
+        (i.saldo > 0 ? fmt(i.saldo) + " pç" : "—") + '</span></td>' +
+      '<td class="cap">' + i.ordens + '</td>';
+    tb.appendChild(tr);
+  });
+
+  var colspan = temCsv ? 5 : 3;
+  document.querySelector("#tbl tfoot").innerHTML =
+    '<tr><td colspan="' + colspan + '">TOTAL' + (parcial ? ' A ENVIAR' : ' GERAL') + '</td>' +
+    '<td class="cap">—</td><td class="num">' + fmt(pedPcs) + '</td>' +
+    '<td class="num">' + fmt(envCxs) + '</td><td class="num">' + fmt(envPcs) + '</td>' +
+    '<td class="num">' + (pedPcs - envPcs > 0 ? fmt(pedPcs - envPcs) + " pç" : "—") + '</td>' +
+    '<td class="cap">' + ordens.length + '</td></tr>';
+
+  tb.querySelectorAll("input.qtd").forEach(function(inp){
+    inp.addEventListener("change", aoEditar);
+    inp.addEventListener("keydown", function(e){ if (e.key === "Enter") inp.blur(); });
+  });
+  tb.querySelectorAll("input.capin").forEach(function(inp){
+    inp.addEventListener("change", aoEditarCap);
+    inp.addEventListener("keydown", function(e){ if (e.key === "Enter") inp.blur(); });
+  });
+
+  renderOrdens(envCxs);
+
+  renderAlertas(itens, ordens, parcial);
+  renderEtiquetas();
+  if (!document.getElementById("painelEtiquetas").hidden){
+    var tem = itensEtq().length > 0;
+    document.getElementById("etiquetas").style.display = tem ? "block" : "none";
+    document.getElementById("etqVazio").style.display = tem ? "none" : "block";
+  }
+  montarImpressao(itens, ordens, envPcs, envCxs, pedPcs, parcial);
+}
+
+/* tabela das ordens, com peças e volumes de cada uma */
+function renderOrdens(cxsConsolidado){
+  var tb = document.querySelector("#tblOrdens tbody");
+  var tf = document.querySelector("#tblOrdens tfoot");
+  tb.innerHTML = "";
+
+  var totPcs = 0, totCxs = 0, dentroN = 0, temFrac = false;
+
+  STATE.ordens.forEach(function(o){
+    var k = chaveOrdem(o);
+    var dentro = !STATE.fora[k];
+    var v = volumesOrdem(o);
+    if (dentro){ totPcs += v.pcs; totCxs += v.cxs; dentroN++; if (v.frac) temFrac = true; }
+
+    var tr = document.createElement("tr");
+    if (!dentro) tr.className = "off";
+    tr.innerHTML =
+      '<td style="text-align:center"><input type="checkbox" ' + (dentro ? "checked" : "") +
+        ' data-ordk="' + esc(k) + '" aria-label="Incluir o pedido ' + esc(o.pedido || o.os) + '"></td>' +
+      '<td class="code">' + esc(o.pedido || "s/ nº") + '</td>' +
+      '<td class="code">' + esc(o.os) + '</td>' +
+      '<td class="num" style="font-weight:400">' + v.itens + '</td>' +
+      '<td class="num">' + fmt(v.pcs) + '</td>' +
+      '<td class="num"><b>' + fmt(v.cxs) + '</b></td>' +
+      '<td style="font-size:12px;color:#c98a00">' +
+        (v.frac ? "tem caixa fracionada — arredondada para cima" : "") + '</td>';
+    tb.appendChild(tr);
+  });
+
+  tf.innerHTML =
+    '<tr><td></td><td colspan="2">TOTAL — ' + dentroN + (dentroN === 1 ? ' ordem' : ' ordens') + '</td>' +
+    '<td></td><td class="num">' + fmt(totPcs) + '</td>' +
+    '<td class="num">' + fmt(totCxs) + '</td><td></td></tr>';
+
+  tb.querySelectorAll("input[data-ordk]").forEach(function(inp){
+    inp.addEventListener("change", function(e){
+      var k = inp.dataset.ordk;
+      if (e.target.checked) delete STATE.fora[k]; else STATE.fora[k] = true;
+      STATE.cortes = {};
+      render();
+    });
+  });
+
+  var temCorte = Object.keys(STATE.cortes).length > 0;
+  var box = document.getElementById("avisoVolumes");
+
+  if (temCorte){
+    box.innerHTML = '<div class="notice warn">Há itens com quantidade cortada. Os volumes por ordem ' +
+      'abaixo são do <b>pedido cheio</b> — o corte é feito por item, não por ordem, então não dá ' +
+      'para saber de qual ordem ele sai. O total a enviar continua no painel do topo.</div>';
+  } else if (cxsConsolidado !== undefined && totCxs !== cxsConsolidado){
+    var dif = totCxs - cxsConsolidado;
+    box.innerHTML = '<div class="notice warn"><b>Dois totais de caixa, e os dois estão certos:</b> ' +
+      'separando cada ordem na sua própria caixa dá <b>' + fmt(totCxs) + '</b>; ' +
+      'juntando tudo numa remessa só dá <b>' + fmt(cxsConsolidado) + '</b> ' +
+      '(o painel do topo mostra esse). A diferença de ' + fmt(Math.abs(dif)) + ' caixa(s) vem de item ' +
+      'que não enche caixa cheia: se cada ordem leva a sua caixa parcial, sobram caixas pela metade. ' +
+      'Para etiquetar volume por pedido, use o número da ordem.</div>';
+  } else if (temFrac){
+    box.innerHTML = '<div class="notice warn">Alguma ordem tem item que não fecha caixa cheia. ' +
+      'O volume foi arredondado para cima, porque a caixa quebrada vai como um volume.</div>';
+  } else {
+    box.innerHTML = "";
+  }
+}
+
+function aoEditar(e){
+  var cod = e.target.dataset.cod, modo = e.target.dataset.modo;
+  var item = STATE.calc.itens.filter(function(i){ return i.cod === cod; })[0];
+  if (!item) return;
+  var v = parseFloat(String(e.target.value).replace(",", ".")); 
+  if (isNaN(v) || v < 0) v = 0;
+  var pcs = modo === "cx" ? v * item.cap : v;
+  pcs = Math.min(Math.round(pcs), item.pcsPedido);
+  if (pcs === item.pcsPedido) delete STATE.cortes[cod]; else STATE.cortes[cod] = pcs;
+  render();
+}
+
+function aoEditarCap(e){
+  var codCli = e.target.dataset.capcod;
+  var v = parseInt(e.target.value, 10);
+  if (isNaN(v) || v < 1){ render(); return; }
+  if (!STATE.cadastro[codCli]){
+    var doCsv = STATE.csv && STATE.csv.itens[codCli];
+    STATE.cadastro[codCli] = { cod:"", desc:(doCsv ? doCsv.desc : ""), cap:v, novo:true };
+  }
+  STATE.cadastro[codCli].cap = v;
+  renderCadastro();
+  refazerDoCSV();
+}
+
+function refazerDoCSV(){
+  if (STATE.origem !== "csv" || !STATE.csv) return;
+  var cortes = STATE.cortes, fora = STATE.fora;
+  STATE.ordens = ordensDoCSV(STATE.csv);
+  STATE.cortes = cortes; STATE.fora = fora;
+  render();
+}
+
+function renderAlertas(itens, ordens, parcial){
+  var box = document.getElementById("alerts"); box.innerHTML = "";
+
+  if (!itens.length || itens.every(function(i){ return i.envPcs === 0; })){
+    box.innerHTML = '<div class="notice err"><b>Nada para enviar.</b> ' +
+      'Marque pelo menos uma ordem e deixe alguma quantidade acima de zero. ' +
+      'O botão "Enviar tudo" volta ao pedido cheio.</div>';
+    return;
+  }
+
+  if (parcial){
+    var cortados = itens.filter(function(i){ return i.saldo > 0 && i.envPcs > 0; });
+    var zerados  = itens.filter(function(i){ return i.envPcs === 0; });
+    var foraN    = Object.keys(STATE.fora).filter(function(k){ return STATE.fora[k]; }).length;
+    var t = "<b>Remessa parcial.</b> ";
+    var partes = [];
+    if (foraN)          partes.push(foraN + (foraN > 1 ? " ordens retiradas" : " ordem retirada"));
+    if (zerados.length) partes.push(zerados.length + (zerados.length > 1 ? " itens zerados" : " item zerado"));
+    if (cortados.length)partes.push(cortados.length + (cortados.length > 1 ? " itens cortados" : " item cortado"));
+    box.innerHTML += '<div class="notice warn">' + t + partes.join(", ") +
+      ". O saldo fica pendente e aparece no relatório impresso.</div>";
+  }
+
+  var frac = itens.filter(function(i){ return i.fracionada && i.envPcs > 0; });
+  if (frac.length){
+    box.innerHTML += '<div class="notice warn"><b>Caixa fracionada:</b><ul><li>' +
+      frac.map(function(i){
+        return esc(i.desc) + " — " + fmt(i.envPcs) + " pçs em caixas de " + i.cap +
+               " dá " + Math.floor(i.envCxs) + " cx cheia(s) + " + (i.envPcs % i.cap) + " pç solta(s).";
+      }).join("</li><li>") + '</li></ul></div>';
+  }
+
+  var semCap = itens.filter(function(i){ return !i.cap; });
+  if (semCap.length){
+    box.innerHTML += '<div class="notice err"><b>Falta a capacidade da caixa de ' + semCap.length +
+      ' item(ns).</b> Preencha as peças por caixa na coluna Cap. cx para o total de caixas fechar:<ul><li>' +
+      semCap.map(function(i){ return esc(i.desc) + " (" + esc(i.codCli) + ")"; }).join("</li><li>") +
+      '</li></ul>A impressão fica travada até fechar isso. Depois use "Gravar no app" ' +
+      'para o cadastro já vir preenchido da próxima vez.</div>';
+  }
+
+  var probs = STATE.origem === "csv" ? [] : validar(itens);
+  if (STATE.origem === "csv"){
+    if (!semCap.length)
+      box.innerHTML += '<div class="notice ok">Consolidado montado a partir do CSV. As caixas vêm ' +
+        'da capacidade do cadastro — a OS não foi usada nesta conta.</div>';
+  } else if (probs.length){
+    box.innerHTML += '<div class="notice err"><b>Verificar antes de separar:</b><ul><li>' +
+                     probs.map(esc).join("</li><li>") + '</li></ul></div>';
+  } else {
+    box.innerHTML += '<div class="notice ok">Conferência interna fechada: em todos os itens, ' +
+                     'peças ÷ capacidade bate com a soma de caixas das ordens.</div>';
+  }
+
+  if (STATE.csv && STATE.origem !== "csv"){
+    // compara só os pedidos que estão nesta remessa
+    var naRemessa = {};
+    ordens.forEach(function(o){ if (o.pedido) naRemessa[o.pedido] = true; });
+    var temPed = Object.keys(naRemessa).length > 0;
+    var qtdCsv = function(ext){
+      if (!temPed) return ext.qtd;
+      var t = 0;
+      Object.keys(ext.porPedido).forEach(function(ped){ if (naRemessa[ped]) t += ext.porPedido[ped]; });
+      return t;
+    };
+    var difs = [], faltamCsv = [];
+    itens.forEach(function(i){
+      var ext = STATE.csv.itens[i.codCli];
+      if (!ext){ faltamCsv.push(i.cod + " / " + i.codCli + " — " + i.desc); return; }
+      var q = qtdCsv(ext);
+      if (Math.abs(q - i.pcsPedido) > 0.001)
+        difs.push(i.codCli + " — " + i.desc + ": OS " + fmt(i.pcsPedido) + " pçs × CSV " + fmt(q) + " pçs.");
+    });
+    var pedFora = Object.keys(STATE.csv.pedidosSet || {}).filter(function(ped){ return !naRemessa[ped]; });
+    if (difs.length || faltamCsv.length){
+      var h = '<div class="notice err"><b>Divergência com o arquivo do cliente:</b><ul>';
+      difs.forEach(function(x){ h += "<li>" + esc(x) + "</li>"; });
+      faltamCsv.forEach(function(x){ h += "<li>Nas OS mas não no CSV: " + esc(x) + "</li>"; });
+      box.innerHTML += h + "</ul></div>";
+    } else {
+      box.innerHTML += '<div class="notice ok">Bateu com o arquivo do cliente: os ' +
+                       Object.keys(naRemessa).length + ' pedidos desta remessa conferem peça por peça' +
+                       (parcial ? " (comparação feita antes dos cortes)." : ".") + '</div>';
+    }
+    if (pedFora.length){
+      box.innerHTML += '<div class="notice warn">No CSV do cliente e fora desta remessa: <b>' +
+                       pedFora.map(esc).join(", ") + '</b>.</div>';
+    }
+
+    var nomes = itens.filter(function(i){
+      var ext = STATE.csv.itens[i.codCli];
+      return ext && i.envPcs > 0 && !parecido(i.desc, ext.desc);
+    });
+    if (nomes.length){
+      var n = '<div class="notice warn"><b>Nome diferente do nosso cadastro — atenção na hora de separar:</b><ul>';
+      nomes.forEach(function(i){
+        n += "<li>" + esc(i.desc) + " (" + esc(i.cod) + ") = <b>" + esc(STATE.csv.itens[i.codCli].desc) + "</b> no cliente</li>";
+      });
+      box.innerHTML += n + "</ul></div>";
+    }
+  }
+
+  var caps = {};
+  itens.forEach(function(i){ if (i.envPcs > 0) caps[i.cap] = true; });
+  var lista = Object.keys(caps).map(Number).sort(function(a,b){ return a-b; });
+  if (lista.length > 1){
+    box.innerHTML += '<div class="notice warn">Capacidades por caixa diferentes nesta remessa: <b>' +
+                     lista.join(", ") + '</b> peças. Conferir sempre pela coluna Cap. cx.</div>';
+  }
+}
+
+function parecido(a,b){
+  var norm = function(s){
+    return s.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+            .replace(/[^A-Z0-9 ]/g," ").split(/\s+/)
+            .filter(function(w){ return w.length > 2 && !/^(BLISS|BOLD|GLOB|CRISTAL|CRISTA|TACA|COPO|PARA|RED|GDE|PEQ|CM|ML)$/.test(w); });
+  };
+  var A = norm(a), B = norm(b);
+  if (!A.length || !B.length) return true;
+  return A.some(function(w){ return B.indexOf(w) >= 0; });
+}
+
+function esc(s){
+  return String(s).replace(/[&<>"]/g, function(c){
+    return ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" })[c];
+  });
+}
+
+/* ---------------- folha impressa ---------------- */
+function montarImpressao(itens, ordens, envPcs, envCxs, pedPcs, parcial){
+  var temCsv = !!STATE.csv;
+  var enviar = itens.filter(function(i){ return i.envPcs > 0; });
+  var hoje = new Date().toLocaleDateString("pt-BR");
+  var cliente = (ordens[0] && ordens[0].cliente) || "";
+  var codcli  = (ordens[0] && ordens[0].codcli)  || "";
+
+  var h = '<div class="p-head"><h2>Relatório de Separação Consolidado' +
+          (parcial ? ' — Remessa Parcial' : '') + '</h2>' +
+          '<div><b>' + esc(cliente) + '</b>' + (codcli ? " (cód. " + esc(codcli) + ")" : "") +
+          '<br>' + ordens.length + ' ordens &middot; emitido em ' + hoje + '</div></div>';
+
+  if (parcial){
+    var pend = itens.filter(function(i){ return i.saldo > 0; });
+    var foraN = STATE.ordens.length - ordens.length;
+    h += '<div class="p-parcial">REMESSA PARCIAL — separar somente as quantidades da coluna "A ENVIAR". ' +
+         (foraN ? foraN + ' ordem(ns) fora desta remessa. ' : '') +
+         (pend.length ? pend.length + ' item(ns) com saldo pendente (coluna SALDO).' : '') + '</div>';
+  }
+
+  h += '<table class="' + (parcial ? 'compacta' : '') + '"><thead><tr>' +
+       '<th style="width:52pt">Cód. interno</th><th style="width:' + (temCsv ? (parcial?128:118) : 180) + 'pt">Nossa descrição</th>' +
+       '<th style="width:50pt">Cód. cliente</th>' +
+       (temCsv ? '<th style="width:48pt">Alfa</th><th style="width:' + (parcial?126:145) + 'pt">Descrição cliente</th>' : "") +
+       '<th style="width:26pt">Cap. cx</th>' +
+       (parcial ? '<th style="width:38pt">Pedido pçs</th>' : "") +
+       '<th style="width:40pt">A enviar caixas</th><th style="width:40pt">A enviar peças</th>' +
+       (parcial ? '<th style="width:36pt">Saldo</th>' : "") +
+       '<th style="width:34pt">Cxs separ.</th><th style="width:34pt">Pçs separ.</th>' +
+       '<th style="width:60pt">Conferente</th></tr></thead><tbody>';
+
+  enviar.forEach(function(i){
+    var ext = temCsv ? (STATE.csv.itens[i.codCli] || { alfa:"—", desc:"—" }) : null;
+    var cortou = i.saldo > 0;
+    var cxTxt = i.fracionada
+      ? Math.floor(i.envCxs) + " + " + (i.envPcs % i.cap) + " pç"
+      : String(Math.round(i.envCxs));
+    h += '<tr><td class="code">' + esc(i.cod) + '</td><td>' + esc(i.desc) + '</td>' +
+         '<td class="code">' + esc(i.codCli) + '</td>' +
+         (temCsv ? '<td class="code">' + esc(ext.alfa) + '</td><td>' + esc(ext.desc) + '</td>' : "") +
+         '<td style="text-align:center">' + i.cap + '</td>' +
+         (parcial ? '<td style="text-align:right;color:#666">' + fmt(i.pcsPedido) + '</td>' : "") +
+         '<td style="text-align:right"' + (cortou ? ' class="corte"' : '') + '><b>' + cxTxt + '</b></td>' +
+         '<td style="text-align:right"' + (cortou ? ' class="corte"' : '') + '><b>' + fmt(i.envPcs) + '</b></td>' +
+         (parcial ? '<td style="text-align:right">' + (i.saldo > 0 ? fmt(i.saldo) : "—") + '</td>' : "") +
+         '<td class="fill"></td><td class="fill"></td><td class="fill"></td></tr>';
+  });
+
+  var span = temCsv ? 5 : 3;
+  h += '</tbody><tfoot><tr><td colspan="' + span + '">TOTAL A ENVIAR — ' + enviar.length + ' itens</td>' +
+       '<td></td>' +
+       (parcial ? '<td style="text-align:right;color:#666">' + fmt(pedPcs) + '</td>' : "") +
+       '<td class="big" style="text-align:right">' + fmt(envCxs) + '</td>' +
+       '<td class="big" style="text-align:right">' + fmt(envPcs) + '</td>' +
+       (parcial ? '<td style="text-align:right">' + fmt(pedPcs - envPcs) + '</td>' : "") +
+       '<td class="fill"></td><td class="fill"></td><td class="fill"></td></tr></tfoot></table>';
+
+  var caps = {}; enviar.forEach(function(i){ caps[i.cap] = true; });
+  var lista = Object.keys(caps).map(Number).sort(function(a,b){ return a-b; });
+  var avisos = [];
+  if (temCsv){
+    enviar.forEach(function(i){
+      var ext = STATE.csv.itens[i.codCli];
+      if (ext && !parecido(i.desc, ext.desc))
+        avisos.push(esc(i.desc) + " (" + esc(i.cod) + ") = <b>" + esc(ext.desc) + "</b> no cliente");
+    });
+  }
+  h += '<div class="p-alert">';
+  if (avisos.length) h += '<b>Nomenclatura diferente entre nosso cadastro e o do cliente:</b><br>&bull; ' +
+                          avisos.join(" &nbsp;&bull; ") + "<br>";
+  h += '<b>Capacidades por caixa nesta remessa: ' + lista.join(", ") +
+       ' peças.</b> Conferir sempre pela coluna Cap. cx antes de fechar a contagem.</div>';
+
+  h += '<div class="p-sign">' +
+       '<div>SEPARADOR<span class="p-line"></span>Data: ___/___/___</div>' +
+       '<div>CONFERENTE 1<span class="p-line"></span>Data: ___/___/___</div>' +
+       '<div>CONFERENTE 2<span class="p-line"></span>Data: ___/___/___</div>' +
+       '<div>TOTAL DE CAIXAS CONFERIDO<span class="p-line"></span>P. bruto: ____________</div></div>';
+
+  /* --- página 2: ordens + saldo pendente --- */
+  h += '<div class="p-orders"><div class="p-head"><h2>Ordens desta remessa</h2>' +
+       '<div>' + ordens.length + ' ordens &middot; ' + fmt(envPcs) + ' peças &middot; ' + fmt(envCxs) + ' caixas</div></div>';
+  h += '<table><thead><tr>';
+  for (var c = 0; c < 3; c++)
+    h += '<th style="width:52pt">Nº pedido</th><th style="width:42pt">Nº O.S.</th>' +
+         '<th style="width:42pt">Volumes</th><th style="width:30pt">OK</th>';
+  h += '</tr></thead><tbody>';
+  var linhas = Math.ceil(ordens.length / 3) || 1;
+  var totVolImp = 0;
+  for (var r = 0; r < linhas; r++){
+    h += "<tr>";
+    for (var col = 0; col < 3; col++){
+      var o = ordens[r + col*linhas];
+      if (o){
+        var v = volumesOrdem(o);
+        if (r === 0) { /* soma feita abaixo */ }
+        h += '<td class="code">' + esc(o.pedido || "—") + '</td>' +
+             '<td class="code">' + esc(o.os) + '</td>' +
+             '<td style="text-align:right"><b>' + fmt(v.cxs) + '</b></td>' +
+             '<td class="fill"></td>';
+      } else {
+        h += "<td></td><td></td><td></td><td></td>";
+      }
+    }
+    h += "</tr>";
+  }
+  ordens.forEach(function(o){ totVolImp += volumesOrdem(o).cxs; });
+  h += '</tbody><tfoot><tr><td colspan="10" style="text-align:right">TOTAL DE VOLUMES</td>' +
+       '<td class="big" style="text-align:right"><b>' + fmt(totVolImp) + '</b></td>' +
+       '<td class="fill"></td></tr></tfoot></table>';
+
+  var pend = itens.filter(function(i){ return i.saldo > 0; });
+  var foraOrd = STATE.ordens.filter(function(o){ return STATE.fora[chaveOrdem(o)]; });
+  if (pend.length || foraOrd.length){
+    h += '<h3 style="font-size:11pt;margin:14pt 0 5pt">Fica pendente para a próxima remessa</h3>';
+    if (pend.length){
+      h += '<table><thead><tr><th style="width:60pt">Cód. interno</th><th>Descrição</th>' +
+           '<th style="width:60pt">Cód. cliente</th><th style="width:44pt">Saldo peças</th>' +
+           '<th style="width:44pt">Saldo caixas</th></tr></thead><tbody>';
+      pend.forEach(function(i){
+        var sc = i.saldo / i.cap;
+        h += '<tr><td class="code">' + esc(i.cod) + '</td><td>' + esc(i.desc) + '</td>' +
+             '<td class="code">' + esc(i.codCli) + '</td>' +
+             '<td style="text-align:right"><b>' + fmt(i.saldo) + '</b></td>' +
+             '<td style="text-align:right">' + (Math.abs(sc - Math.round(sc)) > 0.001 ? sc.toFixed(2) : sc) + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    }
+    if (foraOrd.length){
+      h += '<div style="margin-top:7pt;font-size:8pt"><b>Ordens fora desta remessa:</b> ' +
+           foraOrd.map(function(o){ return esc(o.pedido || "s/nº") + " (OS " + esc(o.os) + ")"; }).join(" &middot; ") +
+           '</div>';
+    }
+  }
+
+  h += '<div style="margin-top:12pt;font-size:8pt"><b>Observações da separação:</b>' +
+       '<div style="border-bottom:.5pt solid #000;height:17pt"></div>' +
+       '<div style="border-bottom:.5pt solid #000;height:17pt"></div></div></div>';
+
+  document.getElementById("print").innerHTML = h;
+}
+
+/* ---------------- etiquetas Zebra ---------------- */
+function cfgEtq(){
+  var dpi = parseInt(document.getElementById("etqDpi").value, 10) || 203;
+  var pmm = dpi / 25.4;
+  return {
+    dpi: dpi,
+    larguraMm: parseFloat(document.getElementById("etqL").value) || 100,
+    alturaMm:  parseFloat(document.getElementById("etqA").value) || 50,
+    w: Math.round((parseFloat(document.getElementById("etqL").value) || 100) * pmm),
+    h: Math.round((parseFloat(document.getElementById("etqA").value) || 50) * pmm),
+    modo: document.getElementById("etqTxt").value,
+    dy: parseInt(document.getElementById("etqDy").value, 10) || 0,
+    desc: document.getElementById("etqDesc").checked
+  };
+}
+
+function textoEtq(cap, modo){
+  if (modo === "num")   return String(cap);
+  if (modo === "pecas") return cap + " PEÇAS";
+  return cap + " PÇS";
+}
+
+/* monta o ZPL de um item; ^PQ manda a impressora repetir a etiqueta */
+function zplItem(cap, desc, qtd, c){
+  var txt = textoEtq(cap, c.modo);
+  // fonte ocupando cerca de 55% da altura, reduzida se o texto for longo.
+  var alt = Math.round(c.h * (c.desc ? 0.40 : 0.58));
+  var maxLarg = Math.floor((c.w * 0.92) / (txt.length * 0.62));
+  if (alt > maxLarg) alt = maxLarg;
+  var larg = Math.round(alt * 0.78);
+
+  var z = "^XA\n^CI28\n^PW" + c.w + "\n^LL" + c.h + "\n^MNY\n^LH0,0\n";
+
+  if (!c.desc){
+    // só o número: centraliza esse bloco único na etiqueta inteira
+    var y = Math.round((c.h - alt) / 2) + c.dy;
+    z += "^FO0," + Math.max(0, y) + "^FB" + c.w + ",1,0,C,0^A0N," + alt + "," + larg +
+         "^FD" + txt + "^FS\n";
+  } else {
+    // número + descrição: centraliza o CONJUNTO das duas linhas, com respiro
+    // fixo entre elas (pro rabicho do Ç de "PÇS" não encostar na linha de baixo)
+    var ad = Math.max(18, Math.round(c.h * 0.11));
+    var gap = Math.round(c.h * 0.08);
+    var blocoTotal = alt + gap + ad;
+    var y = Math.round((c.h - blocoTotal) / 2) + c.dy;
+    var yd = y + alt + gap;
+
+    z += "^FO0," + Math.max(0, y) + "^FB" + c.w + ",1,0,C,0^A0N," + alt + "," + larg +
+         "^FD" + txt + "^FS\n";
+    z += "^FO0," + yd + "^FB" + c.w + ",2,0,C,0^A0N," + ad + "," + Math.round(ad*0.55) +
+         "^FD" + String(desc).replace(/[\^~]/g, " ").replace(/[\r\n]+/g, " ") + "^FS\n";
+  }
+  z += "^PQ" + qtd + "\n^XZ\n";
+  return z;
+}
+
+function itensEtq(){
+  if (!STATE.calc) return [];
+  return STATE.calc.itens.filter(function(i){ return i.envPcs > 0 && i.cap; });
+}
+
+function renderEtiquetas(){
+  var sec = document.getElementById("etiquetas");
+  var itens = itensEtq();
+  sec.style.display = itens.length ? "block" : "none";
+  if (!itens.length) return;
+
+  var c = cfgEtq();
+  var tb = document.querySelector("#tblEtq tbody"); tb.innerHTML = "";
+  var total = 0;
+
+  itens.forEach(function(i){
+    if (STATE.etqFora[i.cod]) { } else { total += etqQtd(i); }
+    var tr = document.createElement("tr");
+    var dentro = !STATE.etqFora[i.cod];
+    if (!dentro) tr.className = "off";
+    tr.innerHTML =
+      '<td style="text-align:center"><input type="checkbox" ' + (dentro ? "checked" : "") +
+        ' data-etqon="' + esc(i.cod) + '" aria-label="Incluir ' + esc(i.desc) + '"></td>' +
+      '<td><span class="code">' + esc(i.cod) + '</span> &nbsp;' + esc(i.desc) + '</td>' +
+      '<td class="cap">' + i.cap + '</td>' +
+      '<td class="num">' + fmt(i.cxsFisicas) + '</td>' +
+      '<td class="num"><input type="number" min="0" step="1" value="' + etqQtd(i) +
+        '" data-etqq="' + esc(i.cod) + '" aria-label="Etiquetas de ' + esc(i.desc) + '"></td>';
+    tb.appendChild(tr);
+  });
+
+  document.querySelector("#tblEtq tfoot").innerHTML =
+    '<tr><td></td><td>TOTAL</td><td></td><td class="num">' +
+    fmt(itens.reduce(function(s,i){ return s + (STATE.etqFora[i.cod] ? 0 : i.cxsFisicas); }, 0)) +
+    '</td><td class="num">' + fmt(total) + '</td></tr>';
+
+  tb.querySelectorAll("input[data-etqon]").forEach(function(inp){
+    inp.addEventListener("change", function(){
+      if (inp.checked) delete STATE.etqFora[inp.dataset.etqon];
+      else STATE.etqFora[inp.dataset.etqon] = true;
+      renderEtiquetas();
+    });
+  });
+  tb.querySelectorAll("input[data-etqq]").forEach(function(inp){
+    inp.addEventListener("change", function(){
+      var n = parseInt(inp.value, 10);
+      STATE.etqQtd[inp.dataset.etqq] = (isNaN(n) || n < 0) ? 0 : n;
+      renderEtiquetas();
+    });
+    inp.addEventListener("keydown", function(e){ if (e.key === "Enter") inp.blur(); });
+  });
+
+  // prévia proporcional ao tamanho real
+  var larguraPrev = 280;
+  var escala = larguraPrev / c.larguraMm;
+  var alturaPrev = Math.round(c.alturaMm * escala);
+  var exemplo = itens.filter(function(i){ return !STATE.etqFora[i.cod]; })[0] || itens[0];
+  var txt = textoEtq(exemplo.cap, c.modo);
+  var corpo = Math.min(alturaPrev * (c.desc ? 0.40 : 0.58),
+                       (larguraPrev * 0.92) / (txt.length * 0.62));
+  document.getElementById("etqPreview").innerHTML =
+    '<div class="etq-lbl" style="width:' + larguraPrev + 'px;height:' + alturaPrev + 'px">' +
+    '<b style="font-size:' + Math.round(corpo) + 'px;padding-bottom:' + Math.round(corpo*0.18) + 'px">' + esc(txt) + '</b>' +
+    (c.desc ? '<span style="font-size:' + Math.max(9, Math.round(alturaPrev*0.09)) +
+              'px;margin-top:' + Math.round(corpo*0.14) + 'px">' +
+              esc(exemplo.desc) + '</span>' : '') + '</div>';
+
+  var ativos = itens.filter(function(i){ return !STATE.etqFora[i.cod]; });
+  var capsDist = {};
+  ativos.forEach(function(i){ capsDist[i.cap] = true; });
+  var nCaps = Object.keys(capsDist).length;
+  var agr = document.getElementById("etqAgr").checked && !c.desc;
+  var ativosCount = itens.filter(function(i){ return !STATE.etqFora[i.cod]; }).length;
+  document.getElementById("etqSelResumo").textContent =
+    ativosCount + " de " + itens.length + " marcado(s)";
+  var chkTodos = document.getElementById("chkEtqTodos");
+  chkTodos.checked = ativosCount === itens.length;
+  chkTodos.indeterminate = ativosCount > 0 && ativosCount < itens.length;
+
+  document.getElementById("etqInfo").innerHTML =
+    c.larguraMm + " x " + c.alturaMm + " mm a " + c.dpi + " dpi (" + c.w + " x " + c.h +
+    " pontos).<br><b>" + total + " etiquetas</b> em " + ativos.length + " itens." +
+    (nCaps < ativos.length
+      ? "<br>Como a etiqueta só mostra a quantidade, existem apenas <b>" + nCaps +
+        " tipos diferentes</b> aqui. " +
+        (agr ? "Estão agrupados: sai um bloco por quantidade."
+             : "Marcando “agrupar” sai um bloco por quantidade em vez de um por item.")
+      : "");
+}
+
+/* ---------------- etiqueta avulsa ---------------- */
+/* busca só por código exato — do cliente ou interno — sem listar nada */
+function buscarCadastroPorCodigo(v){
+  v = (v || "").trim();
+  if (!v) return null;
+  if (STATE.cadastro[v]){
+    var i = STATE.cadastro[v];
+    return { codCli:v, cod:i.cod || v, desc:i.desc || "", cap:i.cap || 0 };
+  }
+  var achado = null;
+  Object.keys(STATE.cadastro).forEach(function(c){
+    if (achado) return;
+    var i = STATE.cadastro[c];
+    if (i.cod && i.cod.toLowerCase() === v.toLowerCase()){
+      achado = { codCli:c, cod:i.cod, desc:i.desc || "", cap:i.cap || 0 };
+    }
+  });
+  return achado;
+}
+
+/* atualiza o nome ao lado do código e a prévia, sem imprimir nada */
+function atualizarAvulso(){
+  var v = document.getElementById("etqAvCod").value;
+  var nomeEl = document.getElementById("etqAvNome");
+  var prevEl = document.getElementById("etqAvPreview");
+
+  if (!v.trim()){
+    nomeEl.textContent = ""; nomeEl.className = "etq-av-nome";
+    prevEl.innerHTML = "";
+    return null;
+  }
+
+  var item = buscarCadastroPorCodigo(v);
+  if (!item){
+    nomeEl.textContent = "Código não encontrado no cadastro";
+    nomeEl.className = "etq-av-nome nao-achou";
+    prevEl.innerHTML = "";
+    return null;
+  }
+
+  nomeEl.textContent = item.desc || "(sem descrição no cadastro)";
+  nomeEl.className = "etq-av-nome achou";
+
+  if (!item.cap){
+    prevEl.innerHTML = '<div class="notice err" style="max-width:320px">Sem peças por caixa cadastradas — ' +
+                       'preencha na aba Cadastro para gerar a etiqueta.</div>';
+    return item;
+  }
+
+  var c = cfgEtq();
+  var larguraPrev = 220;
+  var escala = larguraPrev / c.larguraMm;
+  var alturaPrev = Math.round(c.alturaMm * escala);
+  var txt = textoEtq(item.cap, c.modo);
+  var corpo = Math.min(alturaPrev * (c.desc ? 0.40 : 0.58),
+                       (larguraPrev * 0.92) / (txt.length * 0.62));
+  prevEl.innerHTML =
+    '<div class="etq-lbl" style="width:' + larguraPrev + 'px;height:' + alturaPrev + 'px">' +
+    '<b style="font-size:' + Math.round(corpo) + 'px;padding-bottom:' + Math.round(corpo*0.18) + 'px">' +
+    esc(txt) + '</b>' +
+    (c.desc ? '<span style="font-size:' + Math.max(9, Math.round(alturaPrev*0.09)) +
+              'px;margin-top:' + Math.round(corpo*0.14) + 'px">' + esc(item.desc) + '</span>' : '') +
+    '</div>';
+  return item;
+}
+
+function prepararAvulso(){
+  var item = atualizarAvulso();
+  var info = document.getElementById("etqAvInfo");
+  if (!item){
+    info.innerHTML = document.getElementById("etqAvCod").value.trim()
+      ? '<span style="color:#b00020">Não achei esse código no cadastro.</span>'
+      : '<span style="color:#b00020">Digite o código do item primeiro.</span>';
+    return null;
+  }
+  if (!item.cap){
+    info.innerHTML = '<span style="color:#b00020">' + esc(item.desc || item.codCli) +
+      ' está no cadastro sem peças por caixa. Preencha isso na aba Cadastro antes de imprimir.</span>';
+    return null;
+  }
+  var qtd = parseInt(document.getElementById("etqAvQtd").value, 10);
+  if (isNaN(qtd) || qtd < 1) qtd = 1;
+  info.innerHTML = "";
+  return { cap:item.cap, desc:item.desc, qtd:qtd };
+}
+
+/* ---------------- etiquetas ---------------- */
+function etqQtd(i){
+  var v = STATE.etqQtd[i.cod];
+  return v === undefined ? i.cxsFisicas : v;
+}
+
+/* monta uma página por etiqueta, do tamanho exato do rolo, e chama a janela de impressão */
+/* monta a lista final {cap,desc,qtd} a partir de itens ativos, aplicando o agrupamento se marcado */
+function montarListaEtq(ativos, c){
+  var lista = [];
+  if (document.getElementById("etqAgr").checked && !c.desc){
+    var porCap = {};
+    ativos.forEach(function(i){ porCap[i.cap] = (porCap[i.cap] || 0) + i.qtd; });
+    Object.keys(porCap).map(Number).sort(function(a,b){ return a-b; })
+      .forEach(function(cap){ lista.push({ cap:cap, desc:"", qtd:porCap[cap] }); });
+  } else {
+    ativos.forEach(function(i){ lista.push({ cap:i.cap, desc:i.desc, qtd:i.qtd }); });
+  }
+  return lista;
+}
+
+/* abre a janela de impressão do navegador para uma lista já pronta de {cap,desc,qtd} */
+function imprimirListaEtq(lista, c, avisoOrigem){
+  var total = lista.reduce(function(s,x){ return s + x.qtd; }, 0);
+  if (!total){
+    status("Nenhuma etiqueta para imprimir.","warn");
+    return;
+  }
+  if (total > 400 &&
+      !confirm("São " + total + " etiquetas, ou seja, " + total + " páginas na impressora.\n\n" +
+               "Para lotes grandes o arquivo ZPL é bem mais rápido.\n\nQuer continuar mesmo assim?")){
+    return;
+  }
+
+  // @page precisa do tamanho real do rolo, senão sai em A4
+  document.getElementById("etqPage").textContent =
+    "@media print{@page{size:" + c.larguraMm + "mm " + c.alturaMm + "mm;margin:0}}";
+
+  var alvo = document.getElementById("printEtq");
+  var html = "";
+  lista.forEach(function(x){
+    var txt = textoEtq(x.cap, c.modo);
+    var corpo = Math.min(c.alturaMm * (c.desc ? 0.38 : 0.56),
+                         (c.larguraMm * 0.92) / (txt.length * 0.62));
+    var desloc = c.dy ? (c.dy / (c.dpi / 25.4)) : 0;  // pontos -> mm
+    for (var n = 0; n < x.qtd; n++){
+      html += '<div class="etq-pag" style="width:' + c.larguraMm + 'mm;height:' + c.alturaMm +
+              'mm;padding-top:' + desloc.toFixed(2) + 'mm">' +
+              '<b style="font-size:' + corpo.toFixed(2) + 'mm;padding-bottom:' + (corpo*0.18).toFixed(2) + 'mm">' +
+              esc(txt) + '</b>' +
+              (c.desc && x.desc
+                ? '<span style="font-size:' + (c.alturaMm * 0.09).toFixed(2) + 'mm;margin-top:' +
+                  (corpo * 0.14).toFixed(2) + 'mm">' + esc(x.desc) + '</span>'
+                : '') +
+              '</div>';
+    }
+  });
+  alvo.innerHTML = html;
+
+  document.body.classList.add("modo-etq");
+  status("Abrindo a janela de impressão com " + total + " etiquetas" + (avisoOrigem || "") +
+         ". Escolha a Zebra, ou 'Salvar como PDF' para conferir antes.", "ok");
+  window.print();
+}
+
+/* limpa o modo etiqueta assim que a impressão termina ou é cancelada */
+function sairModoEtq(){
+  if (!document.body.classList.contains("modo-etq")) return;
+  document.body.classList.remove("modo-etq");
+  document.getElementById("printEtq").innerHTML = "";
+  document.getElementById("etqPage").textContent = "";
+}
+window.addEventListener("afterprint", sairModoEtq);
+
+function gerarZPLLista(lista, c){
+  return lista.map(function(x){ return zplItem(x.cap, x.desc, x.qtd, c); }).join("");
+}
+
+function imprimirEtiquetas(){
+  var c = cfgEtq();
+  var ativos = itensEtq().filter(function(i){ return !STATE.etqFora[i.cod] && etqQtd(i) > 0; })
+                          .map(function(i){ return { cap:i.cap, desc:i.desc, qtd:etqQtd(i) }; });
+  if (!ativos.length){
+    status("Nenhuma etiqueta para imprimir. Marque ao menos um item.","warn");
+    return;
+  }
+  imprimirListaEtq(montarListaEtq(ativos, c), c, "");
+}
+
+function gerarZPL(){
+  var c = cfgEtq();
+  var ativos = itensEtq().filter(function(i){ return !STATE.etqFora[i.cod] && etqQtd(i) > 0; })
+                          .map(function(i){ return { cap:i.cap, desc:i.desc, qtd:etqQtd(i) }; });
+  return gerarZPLLista(montarListaEtq(ativos, c), c);
+}
+
+/* ---------------- cadastro de produtos ---------------- */
+function renderCadastro(){
+  var busca = (document.getElementById("cadBusca").value || "").toLowerCase().trim();
+  var tb = document.querySelector("#tblCad tbody");
+  var codigos = Object.keys(STATE.cadastro).sort(function(a,b){
+    return (STATE.cadastro[a].cod || "").localeCompare(STATE.cadastro[b].cod || "");
+  });
+  var visiveis = codigos.filter(function(c){
+    if (!busca) return true;
+    var i = STATE.cadastro[c];
+    return (c + " " + (i.cod||"") + " " + (i.desc||"")).toLowerCase().indexOf(busca) >= 0;
+  });
+
+  tb.innerHTML = "";
+  visiveis.forEach(function(c){
+    var i = STATE.cadastro[c];
+    var tr = document.createElement("tr");
+    if (i.novo) tr.className = "novo";
+    tr.innerHTML =
+      '<td><input value="' + esc(c) + '" data-cad="' + esc(c) + '" data-campo="codCli"' +
+        ' aria-label="Código do cliente"></td>' +
+      '<td><input value="' + esc(i.cod || "") + '" data-cad="' + esc(c) + '" data-campo="cod"' +
+        ' aria-label="Código interno"></td>' +
+      '<td><input class="txt" value="' + esc(i.desc || "") + '" data-cad="' + esc(c) + '" data-campo="desc"' +
+        ' aria-label="Descrição"></td>' +
+      '<td><input class="ctr ' + (i.cap ? "" : "vazio") + '" type="number" min="1" step="1" value="' +
+        (i.cap || "") + '" data-cad="' + esc(c) + '" data-campo="cap" aria-label="Peças por caixa"></td>' +
+      '<td style="text-align:center"><button class="del" data-del="' + esc(c) + '"' +
+        ' aria-label="Remover ' + esc(i.desc || c) + '">&times;</button></td>';
+    tb.appendChild(tr);
+  });
+
+  tb.querySelectorAll("input").forEach(function(inp){
+    inp.addEventListener("change", editarCadastro);
+    inp.addEventListener("keydown", function(e){ if (e.key === "Enter") inp.blur(); });
+  });
+  tb.querySelectorAll("button.del").forEach(function(b){
+    b.addEventListener("click", function(){
+      var c = b.dataset.del;
+      if (!confirm("Remover " + (STATE.cadastro[c].desc || c) + " do cadastro?")) return;
+      delete STATE.cadastro[c];
+      renderCadastro();
+      if (STATE.origem === "csv") refazerDoCSV(); else if (STATE.ordens.length) render();
+    });
+  });
+
+  var semCap = codigos.filter(function(c){ return !STATE.cadastro[c].cap; });
+  document.getElementById("cadResumo").textContent =
+    codigos.length + " itens no cadastro" +
+    (busca ? " (" + visiveis.length + " no filtro)" : "") +
+    (semCap.length ? " — " + semCap.length + " sem peças por caixa." : ".");
+
+  var avisos = "";
+  if (semCap.length)
+    avisos += '<div class="notice err">' + semCap.length + ' item(ns) sem peças por caixa. ' +
+              'Sem isso o total de caixas não fecha.</div>';
+  var dupes = checarCadastro();
+  if (dupes.length)
+    avisos += '<div class="notice warn"><b>Código interno repetido em mais de um código do cliente:</b>' +
+              '<ul><li>' + dupes.slice(0,8).map(esc).join("</li><li>") + '</li></ul>' +
+              'Pode ser proposital (mesmo produto com dois códigos no cliente), mas vale conferir.</div>';
+  document.getElementById("cadAviso").innerHTML = avisos;
+  atualizarBadgeCadastro();
+  atualizarAvulso();
+}
+
+/* importa várias linhas: cod cliente | cod interno | descrição | peças por caixa */
+function importarCadastro(texto){
+  var linhas = texto.split(/\r?\n/).filter(function(l){ return l.trim(); });
+  if (!linhas.length) return { novos:0, atualizados:0, ignorados:[] };
+
+  // descobre o separador pela primeira linha com dados
+  var amostra = linhas[0];
+  var sep = "\t";
+  if (amostra.indexOf("\t") < 0){
+    sep = (amostra.match(/;/g)||[]).length >= (amostra.match(/,/g)||[]).length ? ";" : ",";
+  }
+
+  var novos = 0, atualizados = 0, ignorados = [];
+  linhas.forEach(function(l, n){
+    var c = l.split(sep).map(function(x){ return x.trim().replace(/^"|"$/g,"").trim(); });
+    var codCli = c[0] || "";
+    // pula cabeçalho e linhas sem código numérico do cliente
+    if (!/^\d{4,}$/.test(codCli)){
+      if (n > 0 || !/c[oó]d/i.test(l)) ignorados.push("linha " + (n+1) + ": código do cliente inválido (" + (codCli || "vazio") + ")");
+      return;
+    }
+    var cap = parseInt((c[3] || "").replace(/[^\d]/g, ""), 10);
+    if (isNaN(cap) || cap < 1) cap = 0;
+    var existia = !!STATE.cadastro[codCli];
+    var antigo = STATE.cadastro[codCli] || {};
+    STATE.cadastro[codCli] = {
+      cod:  c[1] || antigo.cod  || "",
+      desc: c[2] || antigo.desc || "",
+      cap:  cap  || antigo.cap  || 0
+    };
+    if (existia) atualizados++; else novos++;
+  });
+  return { novos:novos, atualizados:atualizados, ignorados:ignorados };
+}
+
+function mostrarResultadoImport(r){
+  var el = document.getElementById("cadImpRes");
+  if (!r.novos && !r.atualizados){
+    el.innerHTML = '<div class="notice err">Nada foi importado. Confira se as colunas estão na ordem ' +
+      'código do cliente, código interno, descrição, peças por caixa.' +
+      (r.ignorados.length ? '<ul><li>' + r.ignorados.slice(0,6).map(esc).join("</li><li>") + '</li></ul>' : '') +
+      '</div>';
+    return;
+  }
+  var h = '<div class="notice ok"><b>' + r.novos + ' item(ns) novo(s)' +
+          (r.atualizados ? " e " + r.atualizados + " atualizado(s)" : "") + '.</b>';
+  if (r.ignorados.length){
+    h += ' ' + r.ignorados.length + ' linha(s) ignorada(s):<ul><li>' +
+         r.ignorados.slice(0,6).map(esc).join("</li><li>") + '</li></ul>' +
+         (r.ignorados.length > 6 ? '<span style="font-size:12px">(mostrando as 6 primeiras)</span>' : '');
+  }
+  el.innerHTML = h + '</div>';
+}
+
+/* aponta problemas que só aparecem com o cadastro cheio */
+function checarCadastro(){
+  var porInterno = {}, dupes = [];
+  Object.keys(STATE.cadastro).forEach(function(c){
+    var cod = STATE.cadastro[c].cod;
+    if (!cod) return;
+    if (porInterno[cod]) dupes.push(cod + " está em " + porInterno[cod] + " e " + c);
+    else porInterno[cod] = c;
+  });
+  return dupes;
+}
+
+function editarCadastro(e){
+  var c = e.target.dataset.cad, campo = e.target.dataset.campo, v = e.target.value.trim();
+  var item = STATE.cadastro[c];
+  if (!item) return;
+  if (campo === "codCli"){
+    if (!v || v === c){ renderCadastro(); return; }
+    if (STATE.cadastro[v]){ alert("Já existe item com o código de cliente " + v + "."); renderCadastro(); return; }
+    STATE.cadastro[v] = item; delete STATE.cadastro[c];
+  } else if (campo === "cap"){
+    var n = parseInt(v, 10);
+    item.cap = (isNaN(n) || n < 1) ? 0 : n;
+  } else {
+    item[campo] = v;
+  }
+  delete item.novo;
+  renderCadastro();
+  if (STATE.origem === "csv") refazerDoCSV(); else if (STATE.ordens.length) render();
+}
+
+function baixarArquivo(conteudo, nome, tipo){
+  var blob = new Blob([conteudo], { type: tipo || "text/plain;charset=utf-8" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = nome; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function baixarJSON(obj, nome){
+  baixarArquivo(JSON.stringify(obj, null, 2), nome, "application/json");
+}
+
+function carregarCadastroArquivo(file){
+  var fr = new FileReader();
+  fr.onload = function(){
+    try{
+      var obj = JSON.parse(fr.result);
+      var n = 0;
+      Object.keys(obj).forEach(function(c){
+        var i = obj[c];
+        if (i && typeof i === "object"){
+          STATE.cadastro[c] = { cod:i.cod || "", desc:i.desc || "", cap:parseInt(i.cap,10) || 0 };
+          n++;
+        }
+      });
+      renderCadastro();
+      if (STATE.origem === "csv") refazerDoCSV(); else if (STATE.ordens.length) render();
+      status(n + " itens carregados no cadastro.", "ok");
+    } catch(err){
+      status("Arquivo de cadastro inválido: " + err.message, "err");
+    }
+  };
+  fr.readAsText(file, "utf-8");
+}
+
+/* grava o cadastro atual dentro de uma cópia do próprio app */
+function gravarNoApp(){
+  var limpo = document.documentElement.cloneNode(true);
+  ["#tbl tbody", "#tbl tfoot", "#tblCad tbody", "#print", "#alerts",
+   "#orders", "#status", "#csvinfo", "#cadAviso", "#cadResumo"].forEach(function(sel){
+    var el = limpo.querySelector(sel); if (el) el.innerHTML = "";
+  });
+  var res = limpo.querySelector("#result"); if (res) res.style.display = "none";
+  var vaz = limpo.querySelector("#empty"); if (vaz) vaz.style.display = "";
+  var cli = limpo.querySelector("#csvcliente"); if (cli) cli.style.display = "none";
+  var ta  = limpo.querySelector("#paste"); if (ta) ta.textContent = "";
+  var det = limpo.querySelector("details"); if (det) det.removeAttribute("open");
+
+  var html = "<!DOCTYPE html>\n" + limpo.outerHTML;
+  var novo = "var CADASTRO_BASE = " + JSON.stringify(STATE.cadastro, null, 2) + ";";
+  var re = /var CADASTRO_BASE = \{[\s\S]*?\n\};/;
+  if (!re.test(html)){
+    status("Não consegui localizar o cadastro no código do app. Use 'Salvar em arquivo'.", "err");
+    return;
+  }
+  html = html.replace(re, novo);
+
+  var blob = new Blob([html], { type:"text/html;charset=utf-8" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "consolidador-os.html";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  status("Baixei uma cópia do app com " + Object.keys(STATE.cadastro).length +
+         " itens gravados. Substitua o arquivo antigo por esta versão.", "ok");
+}
+
+/* ---------------- fluxo ---------------- */
+function status(msg, tipo){
+  document.getElementById("status").innerHTML =
+    msg ? '<div class="notice ' + (tipo||"warn") + '">' + esc(msg) + '</div>' : "";
+}
+
+async function processarArquivos(files){
+  var lista = Array.prototype.slice.call(files).filter(function(f){ return /\.pdf$/i.test(f.name); });
+  if (!lista.length){ status("Nenhum PDF reconhecido nos arquivos escolhidos.","err"); return; }
+  if (!prepararPdfJs()){
+    status("O leitor de PDF não carregou (sem internet?). Use o campo de colar texto abaixo.","err");
+    return;
+  }
+  status("Lendo " + lista.length + " arquivo(s)...");
+  try{
+    var todas = [];
+    for (var i=0;i<lista.length;i++){
+      var linhas = await pdfParaLinhas(lista[i]);
+      todas = todas.concat(linhas);
+    }
+    aplicar(todas, lista.length + " arquivo(s)");
+  } catch(e){
+    status("Não deu para ler os PDFs: " + e.message + ". Tente colar o texto.","err");
+  }
+}
+
+function aplicar(linhas, origem){
+  var ordens = interpretar(linhas);
+  if (!ordens.length){
+    status("Não encontrei itens no formato esperado. Confira se são as ordens de separação (PED013).","err");
+    return;
+  }
+  STATE.ordens = STATE.ordens.concat(ordens);
+  // remove ordens duplicadas pelo nº de OS
+  var vistos = {};
+  STATE.ordens = STATE.ordens.filter(function(o){
+    var k = o.os + "|" + o.pedido;
+    if (vistos[k]) return false;
+    vistos[k] = true; return true;
+  });
+  STATE.cortes = {};
+  STATE.origem = "os";
+  var novos = aprenderCadastro(ordens);
+  renderCadastro();
+  status(ordens.length + " ordens lidas de " + origem + "." +
+         (novos ? " " + novos + " item(ns) novo(s) foram para o cadastro." : ""), "ok");
+  render();
+}
+
+document.getElementById("drop").addEventListener("click", function(){
+  document.getElementById("pdfs").click();
+});
+document.getElementById("drop").addEventListener("keydown", function(e){
+  if (e.key === "Enter" || e.key === " "){ e.preventDefault(); document.getElementById("pdfs").click(); }
+});
+document.getElementById("pdfs").addEventListener("change", function(e){ processarArquivos(e.target.files); });
+
+["dragenter","dragover"].forEach(function(ev){
+  document.getElementById("drop").addEventListener(ev, function(e){
+    e.preventDefault(); this.classList.add("hot");
+  });
+});
+["dragleave","drop"].forEach(function(ev){
+  document.getElementById("drop").addEventListener(ev, function(e){
+    e.preventDefault(); this.classList.remove("hot");
+  });
+});
+document.getElementById("drop").addEventListener("drop", function(e){
+  processarArquivos(e.dataTransfer.files);
+});
+
+document.getElementById("btnPaste").addEventListener("click", function(){
+  var t = document.getElementById("paste").value;
+  if (!t.trim()){ status("Cole o texto das ordens primeiro.","warn"); return; }
+  aplicar(t.split(/\r?\n/).map(function(l){ return l.replace(/\s+/g," ").trim(); }).filter(Boolean), "texto colado");
+});
+
+document.getElementById("csv").addEventListener("change", function(e){
+  var f = e.target.files[0];
+  if (!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){
+    var r = lerCSV(fr.result);
+    if (!r){
+      document.getElementById("csvinfo").innerHTML = '<span style="color:#b00020">Não reconheci as colunas. Preciso de "Cód. num" e "Qtd".</span>';
+      return;
+    }
+    STATE.csv = r;
+    var n = Object.keys(r.itens).length;
+    document.getElementById("csvinfo").textContent =
+      n + " itens e " + r.pedidos.length + " pedidos carregados de " + f.name + ".";
+
+    if (STATE.ordens.length && STATE.origem === "os"){
+      render();  // usa como conferência das OS já carregadas
+      return;
+    }
+    // sem OS: o CSV vira a fonte do consolidado
+    STATE.origem = "csv";
+    document.getElementById("csvcliente").style.display = "block";
+    STATE.ordens = ordensDoCSV(r);
+    STATE.cortes = {}; STATE.fora = {};
+    var faltando = Object.keys(r.itens).filter(function(c){ return !STATE.cadastro[c]; });
+    status("Consolidado montado do CSV: " + r.pedidos.length + " pedidos, " + n + " itens." +
+           (faltando.length ? " " + faltando.length + " sem cadastro — preencha a capacidade." : ""),
+           faltando.length ? "warn" : "ok");
+    render();
+  };
+  fr.readAsText(f, "utf-8");
+});
+
+document.getElementById("nomeCliente").addEventListener("input", function(e){
+  STATE.cliente = e.target.value;
+  STATE.ordens.forEach(function(o){ if (o.os === "—") o.cliente = STATE.cliente; });
+  if (STATE.ordens.length) render();
+});
+
+document.getElementById("btnPrint").addEventListener("click", function(){
+  sairModoEtq();
+  window.print();
+});
+
+document.getElementById("btnCsv").addEventListener("click", function(){
+  var d = STATE.calc || calcular();
+  var temCsv = !!STATE.csv;
+  var cab = ["Cod interno","Descricao","Cod cliente"];
+  if (temCsv) cab = cab.concat(["Alfa","Descricao cliente"]);
+  cab = cab.concat(["Cap cx","Pedido pecas","Pedido caixas","Enviar pecas","Enviar caixas","Saldo pecas","Ordens"]);
+  var linhas = [cab.join(";")];
+  d.itens.forEach(function(i){
+    var ext = temCsv ? (STATE.csv.itens[i.codCli] || { alfa:"", desc:"" }) : null;
+    var l = [i.cod, i.desc, i.codCli];
+    if (temCsv) l = l.concat([ext.alfa, ext.desc]);
+    l = l.concat([i.cap, i.pcsPedido, i.cxsPedido, i.envPcs,
+                  Math.round(i.envCxs*100)/100, i.saldo, i.ordens]);
+    linhas.push(l.join(";"));
+  });
+  var ep = d.itens.reduce(function(s,i){ return s+i.envPcs; },0);
+  var ec = d.itens.reduce(function(s,i){ return s+i.cxsFisicas; },0);
+  var pp = d.itens.reduce(function(s,i){ return s+i.pcsPedido; },0);
+  linhas.push(["TOTAL","",""].concat(temCsv?["",""]:[])
+              .concat(["", pp, "", ep, ec, pp-ep, d.ordens.length]).join(";"));
+  var blob = new Blob(["\uFEFF" + linhas.join("\r\n")], { type:"text/csv;charset=utf-8" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "consolidado-separacao.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+document.getElementById("btnSalvarCons").addEventListener("click", function(){
+  if (!STATE.ordens.length){
+    status("Nada para salvar ainda. Consolide uma OS ou um CSV primeiro.","warn");
+    return;
+  }
+  var pacote = {
+    tipo: "consolidacao-os",
+    versao: 1,
+    salvoEm: new Date().toISOString(),
+    cliente: STATE.cliente || (STATE.ordens[0] && STATE.ordens[0].cliente) || "",
+    origem: STATE.origem,
+    ordens: STATE.ordens
+  };
+  var cliSlug = (pacote.cliente || "consolidacao").toUpperCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]+/g,"-").replace(/^-|-$/g,"");
+  var hoje = new Date();
+  var data = hoje.getFullYear() + "-" + String(hoje.getMonth()+1).padStart(2,"0") + "-" +
+             String(hoje.getDate()).padStart(2,"0");
+  baixarArquivo(JSON.stringify(pacote, null, 2), "consolidacao-" + cliSlug + "-" + data + ".json",
+               "application/json");
+  status("Consolidação salva: " + STATE.ordens.length + " ordens. Guarde esse arquivo na pasta da rede — " +
+         "em qualquer PC com este mesmo HTML, use \"Abrir consolidação\" para carregar de volta.", "ok");
+});
+
+document.getElementById("abrirCons").addEventListener("change", function(e){
+  var f = e.target.files[0];
+  if (!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){
+    var pacote;
+    try{ pacote = JSON.parse(fr.result); }
+    catch(err){ status("Arquivo inválido: " + err.message, "err"); return; }
+    if (!pacote || !Array.isArray(pacote.ordens) || !pacote.ordens.length){
+      status("Esse arquivo não parece uma consolidação salva por este app.","err");
+      return;
+    }
+    STATE.ordens = pacote.ordens;
+    STATE.cliente = pacote.cliente || "";
+    STATE.origem = pacote.origem === "csv" ? "csv" : "os";
+    STATE.fora = {}; STATE.cortes = {};
+    var novos = aprenderCadastro(STATE.ordens);
+    renderCadastro();
+    if (STATE.cliente){
+      document.getElementById("nomeCliente").value = STATE.cliente;
+      document.getElementById("csvcliente").style.display = "block";
+    }
+    var quando = pacote.salvoEm ? new Date(pacote.salvoEm).toLocaleString("pt-BR") : "";
+    status("Consolidação carregada: " + STATE.ordens.length + " ordens" +
+           (quando ? ", salva em " + quando : "") +
+           (novos ? ". " + novos + " item(ns) novo(s) foram para o cadastro." : "."), "ok");
+    render();
+  };
+  fr.readAsText(f, "utf-8");
+  e.target.value = "";
+});
+
+document.getElementById("btnFull").addEventListener("click", function(){
+  STATE.fora = {}; STATE.cortes = {};
+  render();
+  status("Cortes desfeitos: voltou ao pedido cheio.","ok");
+});
+
+/* ---- etiquetas: botões ---- */
+["etqL","etqA","etqDpi","etqTxt","etqDy","etqDesc","etqAgr"].forEach(function(id){
+  var el = document.getElementById(id);
+  el.addEventListener("change", function(){ renderEtiquetas(); atualizarAvulso(); });
+  el.addEventListener("input", function(){ renderEtiquetas(); atualizarAvulso(); });
+});
+
+document.getElementById("btnEtqImprimir").addEventListener("click", imprimirEtiquetas);
+
+document.getElementById("chkEtqTodos").addEventListener("change", function(e){
+  if (e.target.checked){
+    STATE.etqFora = {};
+  } else {
+    itensEtq().forEach(function(i){ STATE.etqFora[i.cod] = true; });
+  }
+  renderEtiquetas();
+});
+
+document.getElementById("etqAvCod").addEventListener("input", atualizarAvulso);
+document.getElementById("etqAvQtd").addEventListener("input", atualizarAvulso);
+
+document.getElementById("btnEtqAvImprimir").addEventListener("click", function(){
+  var x = prepararAvulso();
+  if (!x) return;
+  var c = cfgEtq();
+  imprimirListaEtq([x], c, " (etiqueta avulsa)");
+});
+document.getElementById("btnEtqAvZpl").addEventListener("click", function(){
+  var x = prepararAvulso();
+  if (!x) return;
+  var c = cfgEtq();
+  baixarArquivo(gerarZPLLista([x], c), "etiqueta-avulsa.zpl");
+  status("Arquivo etiqueta-avulsa.zpl gerado com " + x.qtd + " etiqueta(s) de " + x.desc + ".", "ok");
+});
+
+document.getElementById("btnEtqBaixar").addEventListener("click", function(){
+  var z = gerarZPL();
+  if (!z){ status("Nenhuma etiqueta para gerar. Marque ao menos um item.","warn"); return; }
+  var n = itensEtq().filter(function(i){ return !STATE.etqFora[i.cod]; })
+                    .reduce(function(s,i){ return s + etqQtd(i); }, 0);
+  baixarArquivo(z, "etiquetas.zpl");
+  status("Arquivo etiquetas.zpl gerado com " + n + " etiquetas. " +
+         "Teste uma antes de mandar o lote.", "ok");
+});
+
+document.getElementById("btnEtqCopiar").addEventListener("click", function(){
+  var z = gerarZPL();
+  if (!z){ status("Nenhuma etiqueta para copiar.","warn"); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(z).then(function(){
+      status("ZPL copiado para a área de transferência.","ok");
+    }, function(){ status("Não consegui copiar. Use o botão Baixar ZPL.","warn"); });
+  } else {
+    status("Este navegador não deixa copiar direto. Use o botão Baixar ZPL.","warn");
+  }
+});
+
+document.getElementById("btnEtqTeste").addEventListener("click", function(){
+  var itens = itensEtq().filter(function(i){ return !STATE.etqFora[i.cod]; });
+  if (!itens.length){ status("Marque ao menos um item para tirar o teste.","warn"); return; }
+  baixarArquivo(zplItem(itens[0].cap, itens[0].desc, 1, cfgEtq()), "etiqueta-teste.zpl");
+  status("Etiqueta única de teste gerada. Mande para a Zebra e confira o " +
+         "tamanho antes de rodar o lote.","ok");
+});
+
+/* ---- cadastro: botões ---- */
+document.getElementById("cadBusca").addEventListener("input", renderCadastro);
+
+document.getElementById("btnCadNovo").addEventListener("click", function(){
+  var c = prompt("Código do cliente (o número que vem no CSV / na OS):");
+  if (!c) return;
+  c = c.trim();
+  if (!/^[A-Za-z0-9._-]+$/.test(c)){
+    alert("Use apenas letras, números, ponto, hífen ou sublinhado no código.");
+    return;
+  }
+  if (STATE.cadastro[c]){ alert("Esse código já está no cadastro."); return; }
+  STATE.cadastro[c] = { cod:"", desc:"", cap:0, novo:true };
+  document.getElementById("cadBusca").value = "";
+  renderCadastro();
+  var alvo = document.querySelector('#tblCad input[data-cad="' + c + '"][data-campo="cod"]');
+  if (alvo){ alvo.scrollIntoView({ block:"center" }); alvo.focus(); }
+});
+
+document.getElementById("btnCadOut2").addEventListener("click", function(){
+  baixarJSON(STATE.cadastro, "cadastro-produtos.json");
+});
+document.getElementById("cadIn2").addEventListener("change", function(e){
+  if (e.target.files[0]) carregarCadastroArquivo(e.target.files[0]);
+  e.target.value = "";
+});
+
+document.getElementById("btnCadCola").addEventListener("click", function(){
+  var t = document.getElementById("cadCola").value;
+  if (!t.trim()){
+    document.getElementById("cadImpRes").innerHTML =
+      '<div class="notice warn">Cole as linhas da planilha primeiro.</div>';
+    return;
+  }
+  var r = importarCadastro(t);
+  mostrarResultadoImport(r);
+  if (r.novos || r.atualizados){
+    document.getElementById("cadCola").value = "";
+    renderCadastro();
+    if (STATE.origem === "csv") refazerDoCSV(); else if (STATE.ordens.length) render();
+  }
+});
+
+document.getElementById("cadCsvIn").addEventListener("change", function(e){
+  var f = e.target.files[0];
+  if (!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){
+    var r = importarCadastro(String(fr.result).replace(/^\uFEFF/, ""));
+    mostrarResultadoImport(r);
+    renderCadastro();
+    if (STATE.origem === "csv") refazerDoCSV(); else if (STATE.ordens.length) render();
+  };
+  fr.readAsText(f, "utf-8");
+  e.target.value = "";
+});
+
+document.getElementById("btnCadCsvOut").addEventListener("click", function(){
+  var linhas = ["Cod cliente;Cod interno;Descricao;Pecas por caixa"];
+  Object.keys(STATE.cadastro)
+    .sort(function(a,b){ return (STATE.cadastro[a].cod||"").localeCompare(STATE.cadastro[b].cod||""); })
+    .forEach(function(c){
+      var i = STATE.cadastro[c];
+      linhas.push([c, i.cod || "", (i.desc || "").replace(/;/g, ","), i.cap || ""].join(";"));
+    });
+  var blob = new Blob(["\uFEFF" + linhas.join("\r\n")], { type:"text/csv;charset=utf-8" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "cadastro-produtos.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  status("Cadastro exportado com " + (linhas.length - 1) + " itens. " +
+         "Edite no Excel e importe de volta pelo mesmo painel.", "ok");
+});
+
+/* "Gravar no app" saiu na versão web: o cadastro fica no banco (veja Nuvem, no fim). */
+
+/* ---- abas ---- */
+var ABAS = ["consolidar", "etiquetas", "cadastro"];
+function irParaAba(nome){
+  ABAS.forEach(function(a){
+    document.getElementById("painel" + a.charAt(0).toUpperCase() + a.slice(1)).hidden = (a !== nome);
+    var bt = document.querySelector('.tab[data-tab="' + a + '"]');
+    bt.setAttribute("aria-selected", a === nome ? "true" : "false");
+  });
+  if (nome === "etiquetas"){
+    var tem = itensEtq().length > 0;
+    document.getElementById("etiquetas").style.display = tem ? "block" : "none";
+    document.getElementById("etqVazio").style.display = tem ? "none" : "block";
+    atualizarAvulso();
+  }
+}
+document.querySelectorAll(".tab").forEach(function(bt){
+  bt.addEventListener("click", function(){ irParaAba(bt.dataset.tab); });
+});
+
+function atualizarBadgeCadastro(){
+  var n = Object.keys(STATE.cadastro).length;
+  document.getElementById("tabCadCount").textContent = n || "";
+}
+
+renderCadastro();
+atualizarBadgeCadastro();
+atualizarAvulso();
+irParaAba("consolidar");
+
+document.getElementById("btnClear").addEventListener("click", function(){
+  var cad = STATE.cadastro;
+  STATE = novoEstado();
+  STATE.cadastro = cad;
+  document.getElementById("result").style.display = "none";
+  document.getElementById("empty").style.display = "block";
+  document.getElementById("csvinfo").textContent = "";
+  document.getElementById("paste").value = "";
+  document.getElementById("pdfs").value = "";
+  document.getElementById("csv").value = "";
+  document.getElementById("csvcliente").style.display = "none";
+  document.getElementById("nomeCliente").value = "";
+  renderCadastro();
+  if (!document.getElementById("painelEtiquetas").hidden) irParaAba("etiquetas");
+  status("");
+});
+
+</script>
+<script>
+/* ---------- conta e banco (Supabase, projeto conferencia-etiquetas) ----------
+   A chave abaixo é a "publishable": foi feita para ficar à vista no código.
+   Sozinha ela não lê nem grava nada. As tabelas só respondem a quem entrou
+   com e-mail e senha E está na lista de autorizados do banco (só você).
+   A sessão fica guardada neste navegador e se renova sozinha. */
+const Conta = (() => {
+  const BASE  = 'https://prbfjlclzopmzfybhliq.supabase.co';
+  const CHAVE = 'sb_publishable_ZJJM0Aaoe2LX4l5D8UQuyQ_m8iJfL-7';
+  const LOCAL = 'conferencia-sessao-v1';
+
+  const ler = () => { try { return JSON.parse(localStorage.getItem(LOCAL)) || null; } catch (e) { return null; } };
+  let s = ler();
+  function guardar(n) {
+    s = n;
+    try { n ? localStorage.setItem(LOCAL, JSON.stringify(n)) : localStorage.removeItem(LOCAL); } catch (e) {}
+  }
+  const daResposta = (j, email) => ({
+    access: j.access_token, refresh: j.refresh_token,
+    expira: j.expires_at ? j.expires_at * 1000 : Date.now() + (j.expires_in || 3600) * 1000,
+    email: (j.user && j.user.email) || email || null
+  });
+
+  function traduzir(j, st) {
+    const c = j.error_code || j.code || '';
+    const m = j.msg || j.message || j.error_description || j.error || '';
+    if (c === 'invalid_credentials' || /invalid login/i.test(m)) return 'E-mail ou senha errados.';
+    if (c === 'email_not_confirmed') return 'Esse e-mail ainda não foi confirmado.';
+    if (/rate_limit/.test(c) || st === 429) return 'Muitas tentativas seguidas. Espere alguns minutos e tente de novo.';
+    if (/refresh_token|session_not_found|bad_jwt/.test(c)) return 'A sessão expirou. Entre de novo.';
+    if (c === 'same_password') return 'A senha nova é igual à antiga.';
+    if (c === 'weak_password') return 'Senha fraca. Use uma mais longa.';
+    if (c === 'user_banned') return 'Este usuário está bloqueado no Supabase.';
+    return m || ('erro ' + st);
+  }
+
+  async function auth(caminho, corpo, { metodo = 'POST', token } = {}) {
+    let r;
+    try {
+      r = await fetch(BASE + '/auth/v1/' + caminho, {
+        method: metodo,
+        headers: Object.assign({ apikey: CHAVE, 'Content-Type': 'application/json' },
+                               token ? { Authorization: 'Bearer ' + token } : {}),
+        body: metodo === 'GET' ? undefined : JSON.stringify(corpo || {})
+      });
+    } catch (e) { throw semInternet(); }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error(traduzir(j, r.status)); e.status = r.status; e.codigo = j.error_code || j.code; throw e; }
+    return j;
+  }
+  function semInternet() { const e = new Error('Sem internet agora. Confira a conexão e tente de novo.'); e.rede = true; return e; }
+  function semSessao() { const e = new Error('Entre com o e-mail de trabalho.'); e.semSessao = true; return e; }
+
+  /* Duas abas abertas dividem a mesma sessão: se a outra já renovou, uso a dela. */
+  let renovando = null;
+  function renovar() {
+    const atual = ler();
+    if (atual && s && atual.refresh !== s.refresh) {
+      s = atual;
+      if (s.expira - Date.now() > 60000) return Promise.resolve();
+    }
+    if (!s) return Promise.reject(semSessao());
+    if (!renovando) {
+      renovando = auth('token?grant_type=refresh_token', { refresh_token: s.refresh })
+        .then(j => guardar(daResposta(j, s && s.email)))
+        .catch(e => {
+          if (!e.rede) { guardar(null); aoSair.forEach(f => f()); }   // sessão recusada: pede login de novo
+          throw e;
+        })
+        .finally(() => { renovando = null; });
+    }
+    return renovando;
+  }
+
+  async function token() {
+    if (!s) throw semSessao();
+    if (s.expira - Date.now() < 60000) await renovar();
+    if (!s) throw semSessao();
+    return s.access;
+  }
+
+  /* Chamada às tabelas. Devolve o JSON, ou null quando a resposta vem vazia. */
+  async function api(caminho, opcoes = {}) {
+    const vai = async () => {
+      const tk = await token();
+      try {
+        return await fetch(BASE + '/rest/v1/' + caminho, Object.assign({}, opcoes, {
+          headers: Object.assign({ apikey: CHAVE, Authorization: 'Bearer ' + tk,
+                                   'Content-Type': 'application/json' }, opcoes.headers || {})
+        }));
+      } catch (e) { throw semInternet(); }
+    };
+    let r = await vai();
+    if (r.status === 401) { await renovar(); r = await vai(); }
+    const texto = await r.text();
+    let j = null; try { j = texto ? JSON.parse(texto) : null; } catch (e) {}
+    if (!r.ok) {
+      const negado = r.status === 401 || r.status === 403 || (j && j.code === '42501');
+      const e = new Error(negado
+        ? 'O banco recusou. Confira se você entrou com o e-mail de trabalho.'
+        : `${r.status} ${(j && j.message) || texto.slice(0, 160)}`);
+      e.status = r.status; e.negado = negado; throw e;
+    }
+    return j;
+  }
+
+  /* Lê a tabela inteira, de mil em mil linhas (o banco entrega no máximo mil por vez). */
+  async function todos(caminho) {
+    const saida = [];
+    for (let de = 0; ; de += 1000) {
+      const parte = await api(caminho, { headers: { Range: `${de}-${de + 999}`, 'Range-Unit': 'items' } });
+      saida.push(...(parte || []));
+      if (!parte || parte.length < 1000) return saida;
+    }
+  }
+
+  async function entrar(email, senha) {
+    guardar(daResposta(await auth('token?grant_type=password', { email, password: senha }), email));
+    aoEntrar.forEach(f => f());
+  }
+  async function sair() {
+    const tk = s && s.access;
+    guardar(null);
+    aoSair.forEach(f => f());
+    if (tk) try { await auth('logout', {}, { token: tk }); } catch (e) {}
+  }
+  function esqueci(email) {
+    return auth('recover?redirect_to=' + encodeURIComponent(location.origin + location.pathname), { email });
+  }
+  async function trocarSenha(nova) {
+    await auth('user', { password: nova }, { metodo: 'PUT', token: await token() });
+  }
+
+  /* Volta do link "esqueci a senha" do e-mail: a sessão vem no endereço. */
+  function lerRetorno() {
+    if (!location.hash || location.hash.length < 2) return null;
+    const h = new URLSearchParams(location.hash.slice(1));
+    const limpar = () => history.replaceState(null, '', location.pathname + location.search);
+    if (h.get('error_description') || h.get('error')) {
+      limpar();
+      return { erro: /expired|invalid/i.test(h.get('error_code') || h.get('error_description') || '')
+        ? 'O link do e-mail expirou ou já foi usado. Peça outro em "Esqueci a senha".'
+        : (h.get('error_description') || h.get('error')) };
+    }
+    if (!h.get('access_token') || !h.get('refresh_token')) return null;
+    guardar(daResposta({ access_token: h.get('access_token'), refresh_token: h.get('refresh_token'),
+                         expires_at: Number(h.get('expires_at')) || 0, expires_in: Number(h.get('expires_in')) || 3600 }));
+    limpar();
+    auth('user', null, { metodo: 'GET', token: s.access })
+      .then(u => { if (s && u && u.email) guardar(Object.assign({}, s, { email: u.email })); }).catch(() => {});
+    return { tipo: h.get('type') };
+  }
+
+  const aoEntrar = [], aoSair = [];
+  return {
+    api, todos, entrar, sair, esqueci, trocarSenha, lerRetorno,
+    get logado() { return !!s; },
+    get email() { return s && s.email; },
+    aoEntrar: f => aoEntrar.push(f),
+    aoSair: f => aoSair.push(f)
+  };
+})();
+</script>
+<script>
+/* ---------- Consolidador na nuvem: login e cadastro no banco ----------
+   O arquivo publicado é público, então ele não traz o cadastro: depois do login, o de-para
+   (código do cliente -> código interno, descrição, peças por caixa) vem do banco e fica só
+   na memória desta aba. Qualquer mudança no cadastro (aprender da OS, editar, importar,
+   apagar) é gravada sozinha no banco e passa a valer em qualquer computador.
+   As ordens lidas e a consolidação continuam só neste computador: nada disso é enviado. */
+var Nuvem = (function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var TABELA = "consolidador_cadastro";
+  var COD_OK = /^\d{4,20}$/;
+  var salvo = {};          // o que está no banco: cod_cliente -> linha
+  var pronto = false;      // só grava depois de carregar
+  var timer = null, salvando = false, deNovo = false, pendente = false;
+
+  /* ---- telas do portão ---- */
+  function tela(qual) {
+    ["nv-entrar", "nv-nova", "nv-aguarde"].forEach(function (t) { $(t).style.display = t === qual ? "" : "none"; });
+    document.body.classList.toggle("travado", !!qual);
+  }
+  function aguarde(texto, comAcoes) {
+    $("nv-aguarde-texto").textContent = texto;
+    $("nv-aguarde-acoes").style.display = comAcoes ? "" : "none";
+    tela("nv-aguarde");
+  }
+  function abrirEntrar(texto) {
+    if (texto) $("nv-entrar-texto").textContent = texto;
+    $("nv-entrar-erro").textContent = "";
+    tela("nv-entrar");
+    setTimeout(function () { ($("nv-email-in").value ? $("nv-senha-in") : $("nv-email-in")).focus(); }, 30);
+  }
+  function marca(texto, tipo) {
+    var m = $("nv-estado");
+    m.textContent = texto || "";
+    m.className = "nv-estado" + (tipo ? " " + tipo : "");
+    m.title = tipo === "erro" ? "Clique para tentar gravar de novo" : "";
+  }
+
+  /* ---- cadastro ---- */
+  function linha(k, i) {
+    var cap = parseInt(i && i.cap, 10);
+    return { cod_cliente: k, cod: String((i && i.cod) || "").slice(0, 30),
+             descricao: String((i && i.desc) || "").slice(0, 200),
+             cap: isNaN(cap) || cap < 0 ? 0 : Math.min(cap, 100000) };
+  }
+  function igual(a, b) { return !!a && !!b && a.cod === b.cod && a.descricao === b.descricao && a.cap === b.cap; }
+
+  function carregar() {
+    pronto = false;
+    aguarde("Buscando o cadastro...", false);
+    return Conta.todos(TABELA + "?select=cod_cliente,cod,descricao,cap&order=cod_cliente")
+      .then(function (r) {
+        if (r && r.length) return r;
+        /* vazio: ou ainda não foi liberado (o banco devolve vazio), ou o cadastro está vazio mesmo */
+        return Conta.api("rpc/sou_autorizado", { method: "POST", body: "{}" }).then(function (lib) {
+          if (lib !== true) { var e = new Error("não liberado"); e.naoLiberado = true; throw e; }
+          return [];
+        });
+      })
+      .then(function (r) {
+        var cad = {};
+        salvo = {};
+        (r || []).forEach(function (x) {
+          if (!x || !COD_OK.test(String(x.cod_cliente))) return;
+          cad[x.cod_cliente] = { cod: x.cod || "", desc: x.descricao || "", cap: parseInt(x.cap, 10) || 0 };
+          salvo[x.cod_cliente] = linha(x.cod_cliente, cad[x.cod_cliente]);
+        });
+        STATE.cadastro = cad;
+        renderCadastro();                       // pronto ainda é false: não regrava o que acabou de chegar
+        if (STATE.origem === "csv" && STATE.csv) refazerDoCSV(); else if (STATE.ordens.length) render();
+        pronto = true; pendente = false;
+        $("nv-email").textContent = Conta.email || "";
+        marca("cadastro na nuvem", "ok");
+        tela(null);
+      })
+      .catch(function (e) {
+        if (e.semSessao || !Conta.logado) return abrirEntrar("A sessão expirou. Entre de novo.");
+        if (e.naoLiberado) return aguarde((Conta.email || "Este usuário") + " entrou, mas ainda não foi liberado para usar o consolidador. " +
+                                          "Peça a quem administra para liberar e depois toque em \"Tentar de novo\".", true);
+        aguarde("Não consegui buscar o cadastro: " + e.message, true);
+      });
+  }
+
+  function agendar() {
+    if (!pronto) return;
+    pendente = true;
+    clearTimeout(timer);
+    timer = setTimeout(function () { timer = null; salvar(); }, 700);
+    marca("salvando o cadastro...", "");
+  }
+
+  function salvar() {
+    if (!pronto) return;
+    if (salvando) { deNovo = true; return; }
+    var atual = {}, invalidos = [];
+    Object.keys(STATE.cadastro).forEach(function (k) {
+      if (COD_OK.test(k)) atual[k] = linha(k, STATE.cadastro[k]); else invalidos.push(k);
+    });
+    var mudou = Object.keys(atual).filter(function (k) { return !igual(atual[k], salvo[k]); }).map(function (k) { return atual[k]; });
+    var sumiu = Object.keys(salvo).filter(function (k) { return !atual[k]; });
+    var fim = function () {
+      pendente = false;
+      if (invalidos.length) marca(invalidos.length + " item(ns) com código do cliente inválido não foram gravados (" +
+                                  invalidos.slice(0, 3).join(", ") + ")", "erro");
+      else marca("cadastro salvo na nuvem", "ok");
+    };
+    if (!mudou.length && !sumiu.length) { fim(); return; }
+
+    salvando = true;
+    var agora = new Date().toISOString(), passos = [], i;
+    for (i = 0; i < mudou.length; i += 200) (function (lote) {
+      passos.push(function () {
+        return Conta.api(TABELA, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify(lote.map(function (x) { return Object.assign({ atualizado_em: agora }, x); })) });
+      });
+    })(mudou.slice(i, i + 200));
+    for (i = 0; i < sumiu.length; i += 100) (function (lote) {
+      passos.push(function () {
+        return Conta.api(TABELA + "?cod_cliente=in.(" + lote.map(encodeURIComponent).join(",") + ")", { method: "DELETE" });
+      });
+    })(sumiu.slice(i, i + 100));
+
+    passos.reduce(function (p, f) { return p.then(f); }, Promise.resolve())
+      .then(function () {
+        mudou.forEach(function (x) { salvo[x.cod_cliente] = x; });
+        sumiu.forEach(function (k) { delete salvo[k]; });
+        fim();
+      })
+      .catch(function (e) {
+        if (e.semSessao) { abrirEntrar("A sessão expirou. Entre de novo para gravar o cadastro."); return; }
+        marca("não consegui gravar o cadastro: " + e.message + " Clique aqui para tentar de novo.", "erro");
+      })
+      .then(function () {
+        salvando = false;
+        if (deNovo) { deNovo = false; salvar(); }
+      });
+  }
+
+  /* toda mudança no cadastro passa por renderCadastro: é ali que a gravação é agendada */
+  var renderOriginal = renderCadastro;
+  renderCadastro = function () { renderOriginal.apply(this, arguments); agendar(); };
+
+  /* ---- ligações ---- */
+  $("nv-estado").addEventListener("click", function () { if ($("nv-estado").classList.contains("erro")) salvar(); });
+  window.addEventListener("beforeunload", function (e) {
+    if (pendente || salvando) { e.preventDefault(); e.returnValue = ""; }
+  });
+
+  $("nv-entrar").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var b = $("nv-bt-entrar");
+    b.disabled = true; b.textContent = "Entrando..."; $("nv-entrar-erro").textContent = "";
+    Conta.entrar($("nv-email-in").value.trim(), $("nv-senha-in").value)
+      .then(function () { $("nv-senha-in").value = ""; return carregar(); })
+      .catch(function (e) { $("nv-entrar-erro").textContent = e.message; })
+      .then(function () { b.disabled = false; b.textContent = "Entrar"; });
+  });
+  $("nv-esqueci").addEventListener("click", function () {
+    var email = $("nv-email-in").value.trim();
+    if (!email) { $("nv-entrar-erro").textContent = "Digite o e-mail primeiro."; $("nv-email-in").focus(); return; }
+    Conta.esqueci(email)
+      .then(function () {
+        $("nv-entrar-erro").textContent = "";
+        $("nv-entrar-texto").textContent = "Mandei um link para " + email + ". Abra o e-mail e clique no link para escolher a senha nova.";
+      })
+      .catch(function (e) { $("nv-entrar-erro").textContent = e.message; });
+  });
+  $("nv-nova").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var a = $("nv-nova-senha").value, b = $("nv-nova-senha2").value;
+    if (a !== b) { $("nv-nova-erro").textContent = "As duas senhas não são iguais."; return; }
+    $("nv-bt-nova").disabled = true;
+    Conta.trocarSenha(a)
+      .then(function () { $("nv-nova-senha").value = $("nv-nova-senha2").value = ""; return carregar(); })
+      .catch(function (e) { $("nv-nova-erro").textContent = e.message; })
+      .then(function () { $("nv-bt-nova").disabled = false; });
+  });
+  $("nv-sair").addEventListener("click", function () {
+    var aviso = pendente || salvando ? "\n\nAinda estou gravando uma mudança do cadastro. Se sair agora, ela pode se perder." : "";
+    if (confirm("Sair da conta neste computador?" + aviso)) Conta.sair();
+  });
+  $("nv-aguarde-sair").addEventListener("click", function () { Conta.sair(); });
+  $("nv-de-novo").addEventListener("click", carregar);
+  Conta.aoSair(function () {
+    pronto = false; pendente = false; clearTimeout(timer); timer = null;
+    STATE.cadastro = {}; salvo = {};
+    renderCadastro();
+    $("nv-email").textContent = ""; marca("", "");
+    abrirEntrar("Entre com o e-mail de trabalho. É o mesmo login da Conferência e da Central.");
+  });
+
+  /* ---- início ---- */
+  var retorno = Conta.lerRetorno();
+  if (retorno && retorno.erro) abrirEntrar(retorno.erro);
+  else if (retorno && retorno.tipo === "recovery") { tela("nv-nova"); setTimeout(function () { $("nv-nova-senha").focus(); }, 30); }
+  else if (Conta.logado) carregar();
+  else abrirEntrar();
+
+  return { carregar: carregar, salvar: salvar, get pronto() { return pronto; } };
+})();
+</script>
+</body>
+</html>
