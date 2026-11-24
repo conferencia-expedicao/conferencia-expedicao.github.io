@@ -7,8 +7,8 @@
 <title>Central de Documentos</title>
 <meta name="color-scheme" content="light dark">
 <script>
-/* tema escolhido (claro/escuro) fica só neste navegador; sem escolha, segue o do sistema */
-(function(){ try { var t = localStorage.getItem('central-tema'); if (t === 'claro' || t === 'escuro') document.documentElement.setAttribute('data-tema', t); } catch (e) {} })();
+/* tema escolhido (claro/escuro) vale para todos os apps neste navegador; sem escolha, segue o do sistema */
+(function(){ try { var t = localStorage.getItem('apps-tema') || localStorage.getItem('central-tema'); if (t === 'claro' || t === 'escuro') document.documentElement.setAttribute('data-tema', t); } catch (e) {} })();
 </script>
 <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAG20lEQVR4nO2bTWxdRxXHf+fMXH/WdigFG7+2dpxEFWmRkqaVgqrIQIEFFWraAKKtSldIbFiw6BapEisqsWFTCTaQBRIqAhG1EZSKmqQLlKZGggWikuO6tWVTCE0T28/2nTks7n2OHdnpfe9d+9mJ/9JItq9n7pz/nI85c+cIG0MBy5t+enDki6rydcxOYAwj3LlJv9bCuIwwici5GO3Mv2cm/gxEQPIWb+wiGwzjgAAwMDjynIh8H+EYImCGmW2lCE1DRKjNFeOimf10dmbiF/njVdlW/39991EPY+ldlZFDCfxMVEftutCB60xuRNxOgK1pTkQQESzGsRX47n+mJ96pyVjrsEaQ7EF/ZegLgv+NqtwZY0hBlMwkdiMiWFR1Pka7bKSn5qbffWMtCTUCFIgDdw+PgntVoMsspiC+ZVMvFZaKqDdYgPC12fcnx8hllvwH67/33mEJybgIfWYWyOzlVkIQEWfGFXMrR+empibJ1Tt/7E6LSF+28rec8ADOLKYi0kdwp2t/zFS/cvAZp/4Rs3ALqf1GEG8WUqf+kYHKwWeA6AGHxefNxLL4UQwqWaPVUVEgWtYKdhCzaJg9D/xK+isjX1LkdcOMguFNBaoB5lckC7mNTr5JCFm47/RGl6+HBEwQidijXownUAGzSAHbV4FrK8Kh3sjJ/cskLd4RGPCH9zwX/+voSawoCRERJ9GekP7PjIyrkyOWEXDTeC/AcoThHuP3X11gsC9usLncZihcXRROvdbJhQ9cUU2IIqIx2N+8CMP57vZj19IJXE2FU8PLDPZFPpoXfIu3SGmE3i7juUMpf5n1dPtCKiCWebxhj7Avt+JCyixkZmABvIJvsQmIZn6gtqEp2g0MhH0Nr1/xeLH1aGYqjcV8UVCXqUKriTBAbd2erh7UT4AILC/A/BVYUpAWbwRMMkewdAfIJ6k3KNdHgCpUr6FHT8LTj+JXIl5bvGuOERJBXxuHc6ehvRuseGiqjwBRWFlChh6CB7/NTsiTa++XqT5Ifw5yR139GzeBmEIawLdYA0IA52DpWkOeuQkn6DP6tcW5k0nmkLfNCW6CmJ3BbQ8EtKQ4XBoBKjsgJDaAUggIIfLPiRnmF6s41S1TBCHTtLbEc/hAhSTxTWtdUwTUjsg/+N9VfvenC9lktvKMQDK3s5ymdHee4ODQQNPH9E0RILkdfuoTPZz88sPbqgFDg3etm0OjKMUEnFPuP3R3GUPVjyb9TnlRIKxsneqrY52kOzIKuKSsobYVJRBgkC4T3/o19tEcOJ8l6M1CBEKK9PajD30LfBtbEWebI8Ai4InT/2Dlpe+UGwVq4wgkLxxGh45BDLk5lIfmCJDsK7pWHiD53i+3TgMqDwBWuvBQigkI+Hb0+LPND9UC7EWBUkbhto4Ce7nAXi6wlwvs5QIlRAERkIJxfi8KlIfW5wKikFaRe46ih7+SO9LtO1trfS6gwDJIZZC2H/0L2rryr53bQ0Lrc4E1GpAJzy7SAKD0XGCbT5Z3VRRQ3WnnAWtwG0eBbcgFzFBVPnugQmdHW6lD74pcQFVYrC5jGMfuHyFGK80cdkcusEYDoFxf0DABa7OwluYCN8ylXniMDxHZR8GbomaG5oUIaRqyggRAkFJX3mLkRltarQap/Q6kaYpvb0ed1kNEttMy+1DNmMzH/NjeMUa6ujo588pZFhcX6ehoxzmHdw7nFF9iSxJPkiTrmvcen78ve6ejo70dgJdf/i1JW1vRTZjlVTWTXoTzIEeK9MwI6OKti+M8+Y2neeqpb5L4hKStjXv23wfislVo0kRVYGbyHarVBVR105mZGSEEzrxyllfP/pHe3h5CLHQ/yEAQsfONXZZWZX5+geWVFZaXquw/cB8/+OGPcx0qPMymQrW3d/DST17g7b+ep7O7OzeHjSAYRuI9PT09xGLCw5rL0gK4gcGRt0Xlc1bwwjRkJGSrY6g6jjz8eXp69xFCaHwrbyCqLFUXGb/wJkvV6uo7NkMWdY0QCgsfREQt2t9nZyYe9EBA9EUROW2WFtbfGOMq42macu71s6WW1HV0dCKq9axqQZiJODGxF4FwvWaosv+cimu4akRVWfc9q7HJrY5RvuCQFU85Hy28OTd96QTrBHXhWQs6LqINFU1tzYRLRRBRb2ZXcGE1dVXy0tK5qalLSHjcYEFEHFi6+Vi7DZaKiDNYQMLjc1NTl8gPmWuX6yKM+tn3J8fM0sfMuKzqfE7Cjl/amyCCparOm3HZLH0sqxkc9eRyrbldOJbCqJ+bfveNFDtuMY6pOi+yegMx5J1aXSZ1MxjZHAOAiKiq8xbjWIodv7FqFPaKpzd117dN+fz/AZ/tS5XrO+D3AAAAAElFTkSuQmCC">
 </head>
@@ -596,7 +596,7 @@
   <div class="app-bar-in">
     <div class="app-marca"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></div>
     <div class="app-nome">
-      <h2 class="app-title">Central de Documentos <span class="versao">v10</span></h2>
+      <h2 class="app-title">Central de Documentos <span class="versao">v11</span></h2>
       <p class="app-sub" id="app-sub">Liberação de Pedidos &middot; KOS / GODKS</p>
     </div>
     <div class="pt-conta">
@@ -2442,9 +2442,15 @@ const Tabelas = (function () {
   botao.onclick = () => {
     const novo = atual() === 'escuro' ? 'claro' : 'escuro';
     raiz.setAttribute('data-tema', novo);
-    try { localStorage.setItem('central-tema', novo); } catch (e) {}
+    try { localStorage.setItem('apps-tema', novo); localStorage.removeItem('central-tema'); } catch (e) {}
     pintar();
   };
+  /* trocou em outra aba ou em outro app aberto: acompanha */
+  window.addEventListener('storage', (e) => {
+    if (e.key !== 'apps-tema') return;
+    if (e.newValue === 'claro' || e.newValue === 'escuro') raiz.setAttribute('data-tema', e.newValue); else raiz.removeAttribute('data-tema');
+    pintar();
+  });
   if (sistema && sistema.addEventListener) sistema.addEventListener('change', pintar);
   pintar();
 })();

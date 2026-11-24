@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="light dark">
+<script>
+/* tema escolhido (claro/escuro) vale para todos os apps neste navegador; sem escolha, segue o do sistema */
+(function(){ try { var t = localStorage.getItem('apps-tema') || localStorage.getItem('central-tema');
+  if (t === 'claro' || t === 'escuro') document.documentElement.setAttribute('data-tema', t); } catch (e) {} })();
+</script>
 <title>Ferramentas</title>
 <style>
   :root{
@@ -12,10 +17,16 @@
     --acento:#0B6FA4; --marca:#1B9FD8; --sombra:0 1px 2px rgba(15,28,43,.05),0 2px 6px rgba(15,28,43,.05);
     --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Arial,sans-serif;
   }
+  :root[data-tema="escuro"]{ --fundo:#0E1720; --painel:#16222D; --linha:#243544; --texto:#EEF4F8; --texto2:#93A8B8;
+           --acento:#1B9FD8; --sombra:0 1px 2px rgba(0,0,0,.35); color-scheme:dark; }
   @media (prefers-color-scheme: dark){
-    :root{ --fundo:#0E1720; --painel:#16222D; --linha:#243544; --texto:#EEF4F8; --texto2:#93A8B8;
-           --acento:#1B9FD8; --sombra:0 1px 2px rgba(0,0,0,.35); }
+    :root:not([data-tema="claro"]){ --fundo:#0E1720; --painel:#16222D; --linha:#243544; --texto:#EEF4F8; --texto2:#93A8B8;
+           --acento:#1B9FD8; --sombra:0 1px 2px rgba(0,0,0,.35); color-scheme:dark; }
   }
+  .bt-tema{margin-left:auto;background:transparent;border:1px solid transparent;color:var(--texto2);border-radius:8px;
+           padding:7px 9px;cursor:pointer;display:inline-flex}
+  .bt-tema:hover{background:var(--painel);border-color:var(--linha);color:var(--texto)}
+  .bt-tema svg{width:18px;height:18px;display:block}
   *{box-sizing:border-box}
   body{margin:0;background:var(--fundo);color:var(--texto);font-family:var(--sans);min-height:100vh;padding:0 16px 40px}
   .topo{max-width:900px;margin:0 auto;padding:28px 0 18px;display:flex;align-items:center;gap:12px}
@@ -40,6 +51,7 @@
     <h1>Ferramentas</h1>
     <p class="sub">Faturamento e expedição · KOS / GODKS</p>
   </div>
+  <button class="bt-tema" id="bt-tema" type="button" aria-label="Tema"></button>
 </header>
 
 <main class="grade">
@@ -66,5 +78,37 @@
 </main>
 
 <p class="rod">O login é o mesmo em todos. Entrou em um, já vale para os outros neste navegador.</p>
+<script>
+/* ---------- tema claro / escuro (o mesmo em todos os apps) ---------- */
+(function () {
+  'use strict';
+  var raiz = document.documentElement, botao = document.getElementById('bt-tema');
+  if (!botao) return;
+  var sistema = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  var SOL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></svg>';
+  var LUA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z"/></svg>';
+  function atual() { return raiz.getAttribute('data-tema') || (sistema && sistema.matches ? 'escuro' : 'claro'); }
+  function pintar() {
+    var escuro = atual() === 'escuro';
+    botao.innerHTML = escuro ? SOL : LUA;
+    botao.title = escuro ? 'Usar o tema claro' : 'Usar o tema escuro';
+    botao.setAttribute('aria-label', botao.title);
+  }
+  botao.addEventListener('click', function () {
+    var novo = atual() === 'escuro' ? 'claro' : 'escuro';
+    raiz.setAttribute('data-tema', novo);
+    try { localStorage.setItem('apps-tema', novo); localStorage.removeItem('central-tema'); } catch (e) {}
+    pintar();
+  });
+  /* trocou em outra aba ou em outro app aberto: acompanha */
+  window.addEventListener('storage', function (e) {
+    if (e.key !== 'apps-tema') return;
+    if (e.newValue === 'claro' || e.newValue === 'escuro') raiz.setAttribute('data-tema', e.newValue); else raiz.removeAttribute('data-tema');
+    pintar();
+  });
+  if (sistema && sistema.addEventListener) sistema.addEventListener('change', pintar);
+  pintar();
+})();
+</script>
 </body>
 </html>

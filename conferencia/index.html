@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Conferência de etiquetas — GODKS / KOS</title>
+<meta name="color-scheme" content="light dark">
+<script>
+/* tema escolhido (claro/escuro) vale para todos os apps neste navegador; sem escolha, segue o do sistema */
+(function(){ try { var t = localStorage.getItem('apps-tema') || localStorage.getItem('central-tema');
+  if (t === 'claro' || t === 'escuro') document.documentElement.setAttribute('data-tema', t); } catch (e) {} })();
+</script>
 <style>
 :root{
   --papel:#F4F6FA; --papel2:#FFFFFF; --tinta:#0F1C2B; --tinta2:#5A6B7D; --tinta3:#8A99A8;
@@ -284,6 +290,88 @@ dialog .conta-erro{padding:8px 22px 0;min-height:18px;color:var(--erro);font-siz
   .cartao .detalhe.fora{color:var(--tinta3)}
   .veredito .digitei{margin-top:10px}
   a.btn{text-decoration:none;display:inline-flex;align-items:center}
+/* ══════════ TEMA ESCURO (padrão dos apps) ══════════
+   As mesmas variáveis do tema claro, com as cores do escuro. A impressão volta sempre ao claro. */
+:root{color-scheme:light}
+:root[data-tema="escuro"]{
+  --papel:#0E1720; --papel2:#16222D; --tinta:#EEF4F8; --tinta2:#93A8B8; --tinta3:#6B8396;
+  --etiqueta:#1B9FD8; --azul:#1B9FD8; --azul-bg:rgba(27,159,216,.15);
+  --traco:#243544; --traco2:#1D2C39;
+  --ok:#36C07E; --ok-bg:rgba(54,192,126,.13);
+  --espera:#F0B84B; --espera-bg:rgba(240,184,75,.13);
+  --erro:#F2645F; --erro-bg:rgba(242,100,95,.13);
+  --sombra:0 1px 2px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-tema="claro"]){
+    --papel:#0E1720; --papel2:#16222D; --tinta:#EEF4F8; --tinta2:#93A8B8; --tinta3:#6B8396;
+    --etiqueta:#1B9FD8; --azul:#1B9FD8; --azul-bg:rgba(27,159,216,.15);
+    --traco:#243544; --traco2:#1D2C39;
+    --ok:#36C07E; --ok-bg:rgba(54,192,126,.13);
+    --espera:#F0B84B; --espera-bg:rgba(240,184,75,.13);
+    --erro:#F2645F; --erro-bg:rgba(242,100,95,.13);
+    --sombra:0 1px 2px rgba(0,0,0,.35);
+    color-scheme:dark;
+  }
+}
+/* o que tinha cor fixa no claro: só muda quando o tema é escuro */
+@media screen{
+  :root[data-tema="escuro"] .topo{background:rgba(14,23,32,.88)}
+  :root[data-tema="escuro"] .btn:not(.btn-claro):hover{background:#1D2C39;border-color:#34495B}
+  :root[data-tema="escuro"] .btn-forte,:root[data-tema="escuro"] .btn-forte:hover{color:#07202C}
+  :root[data-tema="escuro"] .btn-forte:hover{background:#3DB2E6;border-color:#3DB2E6}
+  :root[data-tema="escuro"] .alvo,:root[data-tema="escuro"] .cartao:hover,:root[data-tema="escuro"] .parada.leve{border-color:#34495B}
+  :root[data-tema="escuro"] .sem-cadastro,:root[data-tema="escuro"] .veredito.atencao{border-color:rgba(240,184,75,.35)}
+  :root[data-tema="escuro"] .faixa-aviso{border-color:rgba(240,184,75,.35);color:#F0B84B}
+  :root[data-tema="escuro"] .faixa-lote{border-color:rgba(27,159,216,.35)}
+  :root[data-tema="escuro"] .faixa-mes{background:rgba(140,150,255,.12);border-color:rgba(140,150,255,.3);color:#C9D2F5}
+  :root[data-tema="escuro"] .lote,:root[data-tema="escuro"] #busca,:root[data-tema="escuro"] .bipadas li:hover,
+  :root[data-tema="escuro"] .etq{background:#0F1922}
+  :root[data-tema="escuro"] #busca:focus{background:#0F1922}
+  :root[data-tema="escuro"] .veredito.ok{border-color:rgba(54,192,126,.35)}
+  :root[data-tema="escuro"] .veredito.erro{border-color:rgba(242,100,95,.35)}
+  :root[data-tema="escuro"] .veredito .aviso{background:rgba(255,255,255,.05)}
+  :root[data-tema="escuro"] .bipe input::placeholder{color:#6B8396}
+  :root[data-tema="escuro"] dialog::backdrop{background:rgba(4,9,14,.72)}
+  :root[data-tema="escuro"] .sugestoes button:hover{border-color:rgba(27,159,216,.4);color:#1B9FD8}
+  :root[data-tema="escuro"] .etq-barras{background:#fff;color:#000}          /* código de barras: preto no branco */
+  @media (prefers-color-scheme: dark){
+    :root:not([data-tema="claro"]) .topo{background:rgba(14,23,32,.88)}
+    :root:not([data-tema="claro"]) .btn:not(.btn-claro):hover{background:#1D2C39;border-color:#34495B}
+    :root:not([data-tema="claro"]) .btn-forte,:root:not([data-tema="claro"]) .btn-forte:hover{color:#07202C}
+    :root:not([data-tema="claro"]) .btn-forte:hover{background:#3DB2E6;border-color:#3DB2E6}
+    :root:not([data-tema="claro"]) .alvo,:root:not([data-tema="claro"]) .cartao:hover,:root:not([data-tema="claro"]) .parada.leve{border-color:#34495B}
+    :root:not([data-tema="claro"]) .sem-cadastro,:root:not([data-tema="claro"]) .veredito.atencao{border-color:rgba(240,184,75,.35)}
+    :root:not([data-tema="claro"]) .faixa-aviso{border-color:rgba(240,184,75,.35);color:#F0B84B}
+    :root:not([data-tema="claro"]) .faixa-lote{border-color:rgba(27,159,216,.35)}
+    :root:not([data-tema="claro"]) .faixa-mes{background:rgba(140,150,255,.12);border-color:rgba(140,150,255,.3);color:#C9D2F5}
+    :root:not([data-tema="claro"]) .lote,:root:not([data-tema="claro"]) #busca,:root:not([data-tema="claro"]) .bipadas li:hover,
+    :root:not([data-tema="claro"]) .etq{background:#0F1922}
+    :root:not([data-tema="claro"]) #busca:focus{background:#0F1922}
+    :root:not([data-tema="claro"]) .veredito.ok{border-color:rgba(54,192,126,.35)}
+    :root:not([data-tema="claro"]) .veredito.erro{border-color:rgba(242,100,95,.35)}
+    :root:not([data-tema="claro"]) .veredito .aviso{background:rgba(255,255,255,.05)}
+    :root:not([data-tema="claro"]) .bipe input::placeholder{color:#6B8396}
+    :root:not([data-tema="claro"]) dialog::backdrop{background:rgba(4,9,14,.72)}
+    :root:not([data-tema="claro"]) .sugestoes button:hover{border-color:rgba(27,159,216,.4);color:#1B9FD8}
+    :root:not([data-tema="claro"]) .etq-barras{background:#fff;color:#000}
+  }
+  .btn-icone-tema{padding:6px 9px;display:inline-flex;align-items:center}
+  .btn-icone-tema svg{width:17px;height:17px;display:block}
+}
+/* impressão: sempre o claro, papel branco */
+@media print{
+  :root, :root[data-tema="escuro"]{
+    --papel:#F4F6FA !important; --papel2:#FFFFFF !important; --tinta:#0F1C2B !important; --tinta2:#5A6B7D !important; --tinta3:#8A99A8 !important;
+    --etiqueta:#1B9FD8 !important; --azul:#0B6FA4 !important; --azul-bg:#E8F5FC !important;
+    --traco:#DFE5EC !important; --traco2:#EEF2F6 !important;
+    --ok:#17875A !important; --ok-bg:#E6F6EE !important; --espera:#A86400 !important; --espera-bg:#FFF3DB !important;
+    --erro:#CF3A32 !important; --erro-bg:#FDECEA !important;
+    color-scheme:light !important;
+  }
+  html, body{background:#fff !important}
+}
 </style>
 </head>
 <body>
@@ -293,13 +381,14 @@ dialog .conta-erro{padding:8px 22px 0;min-height:18px;color:var(--erro);font-siz
     <span class="logo" aria-hidden="true"></span>
     <div>
       <h1>Conferência de etiquetas</h1>
-      <span class="rota">GODKS &rarr; KOS · v5.7</span>
+      <span class="rota">GODKS &rarr; KOS · v5.8</span>
     </div>
   </div>
   <div class="dir">
     <span class="nuvem-status" id="nuvem-status"></span>
     <span class="quem" id="quem"></span>
     <a class="btn btn-claro" id="bt-inicio" href="../inicio/" title="Todos os apps">Início</a>
+    <button class="btn btn-claro btn-icone-tema" id="bt-tema" type="button" aria-label="Tema"></button>
     <div class="menu-caixa">
       <button class="btn btn-claro btn-icone" id="bt-menu" aria-haspopup="true" aria-expanded="false" aria-label="Mais opções">&#8943;</button>
       <div class="menu oculto" id="menu">
@@ -2830,6 +2919,38 @@ pintarConta();
   else if (Conta.logado) sincronizar();
   else abrirEntrar();
 })();
+})();
+</script>
+<script>
+/* ---------- tema claro / escuro (o mesmo em todos os apps) ---------- */
+(function () {
+  'use strict';
+  var raiz = document.documentElement, botao = document.getElementById('bt-tema');
+  if (!botao) return;
+  var sistema = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  var SOL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></svg>';
+  var LUA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z"/></svg>';
+  function atual() { return raiz.getAttribute('data-tema') || (sistema && sistema.matches ? 'escuro' : 'claro'); }
+  function pintar() {
+    var escuro = atual() === 'escuro';
+    botao.innerHTML = escuro ? SOL : LUA;
+    botao.title = escuro ? 'Usar o tema claro' : 'Usar o tema escuro';
+    botao.setAttribute('aria-label', botao.title);
+  }
+  botao.addEventListener('click', function () {
+    var novo = atual() === 'escuro' ? 'claro' : 'escuro';
+    raiz.setAttribute('data-tema', novo);
+    try { localStorage.setItem('apps-tema', novo); localStorage.removeItem('central-tema'); } catch (e) {}
+    pintar();
+  });
+  /* trocou em outra aba ou em outro app aberto: acompanha */
+  window.addEventListener('storage', function (e) {
+    if (e.key !== 'apps-tema') return;
+    if (e.newValue === 'claro' || e.newValue === 'escuro') raiz.setAttribute('data-tema', e.newValue); else raiz.removeAttribute('data-tema');
+    pintar();
+  });
+  if (sistema && sistema.addEventListener) sistema.addEventListener('change', pintar);
+  pintar();
 })();
 </script>
 </body>

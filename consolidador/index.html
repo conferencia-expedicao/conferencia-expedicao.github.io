@@ -4,10 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Consolidador de Ordens de Separação</title>
+<meta name="color-scheme" content="light dark">
+<script>
+/* tema escolhido (claro/escuro) vale para todos os apps neste navegador; sem escolha, segue o do sistema */
+(function(){ try { var t = localStorage.getItem('apps-tema') || localStorage.getItem('central-tema');
+  if (t === 'claro' || t === 'escuro') document.documentElement.setAttribute('data-tema', t); } catch (e) {} })();
+</script>
 <meta name="description" content="Ferramenta interna para consolidar ordens de separação, calcular peças e caixas, gerar a folha de conferência e as etiquetas de caixa.">
-<meta name="theme-color" content="#1f3864">
+<meta name="theme-color" content="#0B6FA4">
 <meta name="robots" content="noindex, nofollow">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%231f3864'/%3E%3Cpath d='M6 11h20v3H6zm0 6h20v3H6zm0 6h13v3H6z' fill='%23ffe08a'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%231B9FD8'/%3E%3Cpath d='M6 11h20v3H6zm0 6h20v3H6zm0 6h13v3H6z' fill='%23ffffff'/%3E%3C/svg%3E">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
         crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
 <style>
@@ -298,6 +304,183 @@ body.travado #nv-portao{display:flex}
 .nv-estado.ok{background:#e6f4ec;color:var(--ok)}
 .nv-estado.erro{background:#fde8e8;color:var(--alert);cursor:pointer}
 .nv-nota{font-size:12.5px;color:#555;align-self:center}
+/* ══════════ TEMA PADRÃO dos apps (claro e escuro) ══════════
+   Só a tela. Tudo o que é impresso (folha de separação, etiquetas) tem cores próprias, fixas. */
+:root{
+  --c-fundo:#F4F6FA; --c-brilho:rgba(27,159,216,.09);
+  --c-painel:#FFFFFF; --c-painel2:#EEF2F6; --c-campo:#FFFFFF;
+  --c-linha:#DFE5EC; --c-linha2:#C9D3DD;
+  --c-texto:#0F1C2B; --c-texto2:#5A6B7D; --c-texto3:#8A99A8;
+  --c-acento:#0B6FA4; --c-acento-hover:#095B87; --c-acento-texto:#FFFFFF; --c-acento-suave:rgba(27,159,216,.16); --c-marca:#1B9FD8;
+  --c-ok:#17875A; --c-ok-bg:#E6F6EE; --c-esp:#A86400; --c-esp-bg:#FFF3DB; --c-erro:#CF3A32; --c-erro-bg:#FDECEA;
+  --c-sombra:0 1px 2px rgba(15,28,43,.05), 0 2px 6px rgba(15,28,43,.05);
+  --c-sombra-modal:0 24px 60px rgba(15,28,43,.22);
+  --c-topo:rgba(255,255,255,.88);
+  --c-sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+  color-scheme:light;
+}
+:root[data-tema="escuro"]{
+  --c-fundo:#0E1720; --c-brilho:rgba(27,159,216,.13);
+  --c-painel:#16222D; --c-painel2:#0F1922; --c-campo:#0F1922;
+  --c-linha:#243544; --c-linha2:#34495B;
+  --c-texto:#EEF4F8; --c-texto2:#93A8B8; --c-texto3:#6B8396;
+  --c-acento:#1B9FD8; --c-acento-hover:#3DB2E6; --c-acento-texto:#07202C; --c-acento-suave:rgba(27,159,216,.22); --c-marca:#1B9FD8;
+  --c-ok:#36C07E; --c-ok-bg:rgba(54,192,126,.13); --c-esp:#F0B84B; --c-esp-bg:rgba(240,184,75,.13); --c-erro:#F2645F; --c-erro-bg:rgba(242,100,95,.13);
+  --c-sombra:0 1px 2px rgba(0,0,0,.35); --c-sombra-modal:0 24px 60px rgba(0,0,0,.6);
+  --c-topo:rgba(14,23,32,.88);
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-tema="claro"]){
+    --c-fundo:#0E1720; --c-brilho:rgba(27,159,216,.13);
+    --c-painel:#16222D; --c-painel2:#0F1922; --c-campo:#0F1922;
+    --c-linha:#243544; --c-linha2:#34495B;
+    --c-texto:#EEF4F8; --c-texto2:#93A8B8; --c-texto3:#6B8396;
+    --c-acento:#1B9FD8; --c-acento-hover:#3DB2E6; --c-acento-texto:#07202C; --c-acento-suave:rgba(27,159,216,.22); --c-marca:#1B9FD8;
+    --c-ok:#36C07E; --c-ok-bg:rgba(54,192,126,.13); --c-esp:#F0B84B; --c-esp-bg:rgba(240,184,75,.13); --c-erro:#F2645F; --c-erro-bg:rgba(242,100,95,.13);
+    --c-sombra:0 1px 2px rgba(0,0,0,.35); --c-sombra-modal:0 24px 60px rgba(0,0,0,.6);
+    --c-topo:rgba(14,23,32,.88);
+    color-scheme:dark;
+  }
+}
+
+@media screen{
+  body{background:radial-gradient(1000px 420px at 50% -180px, var(--c-brilho), transparent 70%), var(--c-fundo);
+       background-attachment:fixed;color:var(--c-texto);font-family:var(--c-sans)}
+
+  /* ---- topo ---- */
+  .topbar{position:sticky;top:0;z-index:30;background:var(--c-topo);color:var(--c-texto);border-bottom:1px solid var(--c-linha);
+          padding:10px 24px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+  .nv-topo{max-width:1400px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .app-marca{width:36px;height:36px;border-radius:10px;background:var(--c-marca);display:grid;place-items:center;flex:none;
+             box-shadow:0 1px 2px rgba(15,28,43,.18), inset 0 -2px 0 rgba(0,0,0,.12)}
+  .app-marca svg{width:20px;height:20px;display:block}
+  .topbar h1{font-size:16px;font-weight:650;letter-spacing:-.01em;text-transform:none;color:var(--c-texto);display:flex;align-items:center;gap:8px}
+  .topbar p{margin:2px 0 0;font-size:12px;opacity:1;color:var(--c-texto2);font-family:var(--c-sans)}
+  .nv-versao{font-size:10.5px;font-weight:650;opacity:1;color:var(--c-texto2);background:var(--c-painel2);border:1px solid var(--c-linha);
+             padding:1px 7px;border-radius:99px;letter-spacing:.02em}
+  .nv-conta{font-family:var(--c-sans);color:var(--c-texto2);gap:6px}
+  .nv-btn{border:1px solid var(--c-linha2);background:var(--c-painel);color:var(--c-texto);padding:7px 12px;border-radius:9px;
+          font-family:var(--c-sans);font-size:13px;font-weight:600;line-height:1.3;display:inline-flex;align-items:center}
+  .nv-btn:hover{background:var(--c-painel2)}
+  .nv-btn.icone{padding:7px 9px}
+  .nv-btn.icone svg{width:17px;height:17px;display:block}
+  .nv-estado{border-radius:99px;padding:3px 10px;background:var(--c-painel2);color:var(--c-texto2);font-size:12px}
+  .nv-estado.ok{background:var(--c-ok-bg);color:var(--c-ok)}
+  .nv-estado.erro{background:var(--c-erro-bg);color:var(--c-erro)}
+
+  /* ---- abas ---- */
+  .tabs{background:transparent;padding:16px 24px 0;gap:3px}
+  .tabs::before{content:none}
+  .tab{color:var(--c-texto2);background:var(--c-painel2);border:1px solid var(--c-linha);border-radius:9px;padding:9px 18px;
+       font-family:var(--c-sans);font-size:13.5px}
+  .tab:hover{color:var(--c-texto);background:var(--c-painel)}
+  .tab[aria-selected="true"]{background:var(--c-acento);color:var(--c-acento-texto);border-color:var(--c-acento)}
+  .tab:focus-visible{outline:2px solid var(--c-acento);outline-offset:2px}
+  .tab-badge{background:var(--c-painel);color:var(--c-texto);border:1px solid var(--c-linha)}
+  .tab[aria-selected="true"] .tab-badge{background:rgba(255,255,255,.9);color:#07202C;border-color:transparent}
+
+  /* ---- cartões e entrada ---- */
+  .drop{background:var(--c-painel);border:1.5px dashed var(--c-linha2);border-radius:14px}
+  .drop:hover,.drop.hot{border-color:var(--c-acento);background:var(--c-painel)}
+  .drop:focus-visible{outline:2px solid var(--c-acento)}
+  .drop span{color:var(--c-texto2)}
+  .side{background:var(--c-painel);border:1px solid var(--c-linha);border-radius:14px;box-shadow:var(--c-sombra)}
+  .side h2{color:var(--c-texto2)}
+  .side p{color:var(--c-texto2)}
+
+  .btn{font-family:var(--c-sans);border-radius:9px;border:1px solid var(--c-acento);background:var(--c-acento);color:var(--c-acento-texto);padding:8px 15px}
+  .btn:hover{background:var(--c-acento-hover);border-color:var(--c-acento-hover)}
+  .btn.ghost{background:var(--c-painel);color:var(--c-texto);border-color:var(--c-linha2)}
+  .btn.ghost:hover{background:var(--c-painel2)}
+  .btn:focus-visible{outline:2px solid var(--c-acento)}
+
+  textarea,select,input[type=text],input[type=search],input[type=number],input[type=email],input[type=password]{color:var(--c-texto)}
+  textarea{background:var(--c-campo);border:1px solid var(--c-linha2);border-radius:9px}
+  textarea:focus{outline:none;border-color:var(--c-acento);box-shadow:0 0 0 3px var(--c-acento-suave)}
+
+  /* ---- totais ---- */
+  .totals{border:1px solid var(--c-linha);border-radius:14px;overflow:hidden;background:var(--c-painel);box-shadow:var(--c-sombra)}
+  .tot{border-right:1px solid var(--c-linha)}
+  .tot span{color:var(--c-texto2)}
+  .tot.hi{background:var(--c-acento-suave)}
+  .tot.hi b,.tot.hi span{color:var(--c-acento)}
+
+  /* ---- avisos ---- */
+  .notice{background:var(--c-painel);color:var(--c-texto);border-radius:0 10px 10px 0}
+  .notice.err{border-color:var(--c-erro);background:var(--c-erro-bg)}
+  .notice.ok{border-color:var(--c-ok);background:var(--c-ok-bg)}
+  .notice.warn{border-color:var(--c-esp);background:var(--c-esp-bg)}
+
+  /* ---- tabelas ---- */
+  .tablewrap{background:var(--c-painel);border:1px solid var(--c-linha);border-radius:12px}
+  thead th{background:var(--c-painel2);color:var(--c-texto2);border-bottom:1px solid var(--c-linha2)}
+  tbody td{border-bottom:1px solid var(--c-linha)}
+  tbody tr:nth-child(even){background:var(--c-painel2)}
+  tfoot td{background:var(--c-painel2);border-top:2px solid var(--c-linha2);color:var(--c-texto)}
+  tfoot td.num{background:var(--c-acento-suave);color:var(--c-acento)}
+  .chip{background:var(--c-painel);border-color:var(--c-linha);border-radius:8px;color:var(--c-texto)}
+  .chip i{color:var(--c-texto3)}
+  .chip.btn-ord:hover{border-color:var(--c-acento)}
+  .chip.btn-ord.fora{background:var(--c-painel2);color:var(--c-texto3)}
+  .empty{color:var(--c-texto3)}
+  .saldo{color:var(--c-esp)}
+  .saldo.zero{color:var(--c-texto3)}
+
+  input.qtd,input.capin,#tblEtq input[type=number]{background:var(--c-campo);border-color:var(--c-linha2);color:var(--c-texto);border-radius:6px}
+  input.qtd:focus,input.capin:focus{outline:2px solid var(--c-acento);border-color:var(--c-acento)}
+  input.qtd.cortado{border-color:var(--c-esp);background:var(--c-esp-bg);color:var(--c-esp)}
+  input.qtd.zerado,input.capin.falta{border-color:var(--c-erro);background:var(--c-erro-bg);color:var(--c-erro)}
+
+  /* ---- cadastro ---- */
+  #cadastro,#etiquetas{border-top:1px solid var(--c-linha)}
+  #cadBusca{background:var(--c-campo);border:1px solid var(--c-linha2);border-radius:9px}
+  #cadBusca:focus{outline:none;border-color:var(--c-acento);box-shadow:0 0 0 3px var(--c-acento-suave)}
+  #tblCad input{color:var(--c-texto)}
+  #tblCad input:hover{border-color:var(--c-linha2);background:var(--c-campo)}
+  #tblCad input:focus{outline:2px solid var(--c-acento);background:var(--c-campo);border-color:var(--c-acento)}
+  #tblCad input.vazio{background:var(--c-erro-bg);border-color:var(--c-erro)}
+  .del{border-color:var(--c-linha2);color:var(--c-texto3);border-radius:6px}
+  .del:hover{border-color:var(--c-erro);color:var(--c-erro);background:var(--c-erro-bg)}
+  tr.novo td{background:var(--c-esp-bg) !important}
+  .nv-nota{color:var(--c-texto2)}
+
+  /* ---- etiquetas ---- */
+  .etq-cfg{background:var(--c-painel);border:1px solid var(--c-linha);border-radius:12px}
+  .etq-cfg label,.etq-avulso-linha label,.etq-prev h3,.etq-prev p,.etq-sel-resumo,h2.sec{color:var(--c-texto2)}
+  .etq-cfg input,.etq-cfg select,.etq-avulso-linha input{background:var(--c-campo);border-color:var(--c-linha2);color:var(--c-texto);border-radius:6px}
+  .etq-cfg input:focus,.etq-cfg select:focus,.etq-avulso-linha input:focus{outline:2px solid var(--c-acento)}
+  .etq-cfg label.etq-chk{color:var(--c-texto)}
+  .etq-lbl{color:#000}                      /* prévia da etiqueta: é papel, fica branca */
+  .etq-avulso{background:var(--c-painel);border:1px solid var(--c-linha);border-left:4px solid var(--c-acento);border-radius:0 12px 12px 0}
+  .etq-av-nome{color:var(--c-texto)}
+  .etq-av-nome.nao-achou{color:var(--c-texto3)}
+
+  /* textos com cor fixa no meio da página */
+  .wrap [style*="color:#555"],.wrap [style*="color:#666"],.wrap [style*="color:#888"],.wrap [style*="color:#444"]{color:var(--c-texto2) !important}
+  .wrap [style*="color:#b00020"]{color:var(--c-erro) !important}
+  .wrap [style*="color:#c98a00"]{color:var(--c-esp) !important}
+  .wrap code[style*="background:#eee"]{background:var(--c-painel2) !important;color:var(--c-texto)}
+
+  /* ---- login ---- */
+  .nv-card{background:var(--c-painel);border:1px solid var(--c-linha);border-top:1px solid var(--c-linha);border-radius:18px;padding:28px;
+           box-shadow:var(--c-sombra-modal);color:var(--c-texto)}
+  .nv-card h2{text-transform:none;letter-spacing:-.01em;color:var(--c-texto);font-size:19px;font-weight:650}
+  .nv-card .app-marca{width:44px;height:44px;border-radius:12px;margin:0 0 16px}
+  .nv-card .app-marca svg{width:24px;height:24px}
+  .nv-texto{color:var(--c-texto2)}
+  .nv-card input{background:var(--c-campo);border:1px solid var(--c-linha2);color:var(--c-texto);border-radius:10px}
+  .nv-card input:focus{outline:none;border-color:var(--c-acento);box-shadow:0 0 0 3px var(--c-acento-suave)}
+  .nv-erro{color:var(--c-erro)}
+  .nv-link{color:var(--c-texto2)}
+}
+
+/* impressão: papel sempre branco, mesmo no tema escuro */
+@media print{
+  :root, :root[data-tema="escuro"]{color-scheme:light !important}
+  html, body{background:#fff !important}
+}
+
 @media print{
   @page{size:A4 landscape;margin:9mm}
 
@@ -339,6 +522,7 @@ body.travado #nv-portao{display:flex}
 
 <div id="nv-portao">
   <form class="nv-card" id="nv-entrar">
+    <div class="app-marca"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5-9 4.5z"/><path d="M3 7.5v9L12 21l9-4.5v-9"/><path d="M12 12v9"/></svg></div>
     <h2>Consolidador de Ordens</h2>
     <p class="nv-texto" id="nv-entrar-texto">Entre com o e-mail de trabalho. É o mesmo login da Conferência e da Central.</p>
     <input id="nv-email-in" type="email" autocomplete="username" placeholder="e-mail de trabalho" required aria-label="E-mail">
@@ -369,14 +553,16 @@ body.travado #nv-portao{display:flex}
 
 <header class="topbar noprint">
   <div class="nv-topo">
+    <div class="app-marca"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5-9 4.5z"/><path d="M3 7.5v9L12 21l9-4.5v-9"/><path d="M12 12v9"/></svg></div>
     <div>
-      <h1>Consolidador de Ordens de Separação <span class="nv-versao">v1</span></h1>
+      <h1>Consolidador de Ordens de Separação <span class="nv-versao">v2</span></h1>
       <p>Junta itens repetidos entre várias OS &middot; soma peças e caixas &middot; gera a folha de separação e conferência</p>
     </div>
     <div class="nv-conta">
       <span id="nv-estado" class="nv-estado" role="status"></span>
       <span id="nv-email"></span>
       <a class="nv-btn" href="../inicio/" title="Todos os apps">Início</a>
+      <button class="nv-btn icone" id="bt-tema" type="button" title="Trocar o tema" aria-label="Trocar o tema"></button>
       <button class="nv-btn" id="nv-sair" type="button">Sair</button>
     </div>
   </div>
@@ -2646,6 +2832,38 @@ var Nuvem = (function () {
   else abrirEntrar();
 
   return { carregar: carregar, salvar: salvar, get pronto() { return pronto; } };
+})();
+</script>
+<script>
+/* ---------- tema claro / escuro (o mesmo em todos os apps) ---------- */
+(function () {
+  'use strict';
+  var raiz = document.documentElement, botao = document.getElementById('bt-tema');
+  if (!botao) return;
+  var sistema = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  var SOL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></svg>';
+  var LUA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z"/></svg>';
+  function atual() { return raiz.getAttribute('data-tema') || (sistema && sistema.matches ? 'escuro' : 'claro'); }
+  function pintar() {
+    var escuro = atual() === 'escuro';
+    botao.innerHTML = escuro ? SOL : LUA;
+    botao.title = escuro ? 'Usar o tema claro' : 'Usar o tema escuro';
+    botao.setAttribute('aria-label', botao.title);
+  }
+  botao.addEventListener('click', function () {
+    var novo = atual() === 'escuro' ? 'claro' : 'escuro';
+    raiz.setAttribute('data-tema', novo);
+    try { localStorage.setItem('apps-tema', novo); localStorage.removeItem('central-tema'); } catch (e) {}
+    pintar();
+  });
+  /* trocou em outra aba ou em outro app aberto: acompanha */
+  window.addEventListener('storage', function (e) {
+    if (e.key !== 'apps-tema') return;
+    if (e.newValue === 'claro' || e.newValue === 'escuro') raiz.setAttribute('data-tema', e.newValue); else raiz.removeAttribute('data-tema');
+    pintar();
+  });
+  if (sistema && sistema.addEventListener) sistema.addEventListener('change', pintar);
+  pintar();
 })();
 </script>
 </body>
