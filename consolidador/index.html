@@ -555,7 +555,7 @@ body.travado #nv-portao{display:flex}
   <div class="nv-topo">
     <div class="app-marca"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5-9 4.5z"/><path d="M3 7.5v9L12 21l9-4.5v-9"/><path d="M12 12v9"/></svg></div>
     <div>
-      <h1>Consolidador de Ordens de Separação <span class="nv-versao">v3</span></h1>
+      <h1>Consolidador de Ordens de Separação <span class="nv-versao">v4</span></h1>
       <p>Junta itens repetidos entre várias OS &middot; soma peças e caixas &middot; gera a folha de separação e conferência</p>
     </div>
     <div class="nv-conta">
@@ -1562,18 +1562,18 @@ function svgEtq(cap, desc, c, W, H, tam){
   var mmPorPt = 25.4 / c.dpi, u = W / c.larguraMm;                    // unidades por mm
   var dx = (c.dx || 0) * mmPorPt * u, dy = (c.dy || 0) * mmPorPt * u;   // ajustes (pontos -> unidades)
 
-  var fN = H * (temDesc ? 0.50 : (unidade ? 0.74 : 0.90));
+  var fN = H * (temDesc ? 0.70 : (unidade ? 0.74 : 0.90));
   var mN = medirTinta(num, 800);
   fN = Math.min(fN, (W * 0.90) / mN.larg);
   var fU = 0, mU = null;
-  if (unidade){ mU = medirTinta(unidade, 800); fU = Math.min(fN * 0.30, (W * 0.90) / mU.larg); }
+  if (unidade){ mU = medirTinta(unidade, 800); fU = Math.min(fN * (temDesc ? 0.26 : 0.30), (W * 0.90) / mU.larg); }
   var fD = temDesc ? H * 0.075 : 0, linhasD = temDesc ? quebrarDesc(desc, fD, W * 0.90) : [];
-  var gap1 = H * 0.06, gap2 = H * 0.05, lh = fD * 1.2;
+  var gap1 = H * (temDesc ? 0.04 : 0.06), gap2 = H * (temDesc ? 0.04 : 0.05), lh = fD * 1.2;
 
   function altura(k){
     var t = mN.asc * fN * k;
     if (unidade) t += gap1 * k + (mU.asc + mU.desc) * fU * k;
-    if (temDesc) t += gap2 * k + (linhasD.length - 1) * lh * k + 0.95 * fD * k;
+    if (temDesc) t += gap2 * k + (linhasD.length - 1) * lh * k + 0.76 * fD * k;
     return t;
   }
   var k = 1, total = altura(1);
