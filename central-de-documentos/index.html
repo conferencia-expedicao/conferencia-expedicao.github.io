@@ -596,7 +596,7 @@
   <div class="app-bar-in">
     <div class="app-marca"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></div>
     <div class="app-nome">
-      <h2 class="app-title">Central de Documentos <span class="versao">v11</span></h2>
+      <h2 class="app-title">Central de Documentos <span class="versao">v12</span></h2>
       <p class="app-sub" id="app-sub">Liberação de Pedidos &middot; KOS / GODKS</p>
     </div>
     <div class="pt-conta">
@@ -1239,7 +1239,7 @@ ligarFormatacoes();
 
 // campos que a cotação preenche sozinha
 const CAMPOS_AUTO = ['cliente','codigo','nat_operacao','cond_pagamento','tabela','tabela_codigo',
-                     'transportadora','transportadora_codigo','representante','representante_codigo','valor_pedido','frete'];
+                     'transportadora','transportadora_codigo','representante','representante_codigo','frete'];
 let cotacaoNoFormulario = false;   // já existe uma cotação extraída neste formulário?
 
 function limparCampo(i){ i.value=''; i.classList.remove('auto-filled'); i.classList.remove('faltando'); if (typeof Cabe !== 'undefined') Cabe.ajustar(i); }
@@ -1500,7 +1500,6 @@ async function extractFromCotacao(){
     if (typeof Atalhos !== 'undefined') Atalhos.freteDaCotacao(d.transportadora);
     setAuto('representante', d.representante);
     setAuto('representante_codigo', d.representante_codigo);
-    setAuto('valor_pedido', d.valor_total);
 
     let aviso = '';
     if(d.empresa){
